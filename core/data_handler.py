@@ -87,6 +87,18 @@ class DataHandler:
     @rate_limited(limiter=None, key="get_nifty_spot")
     def get_nifty_spot(self) -> float:
         """
+        Get current NIFTY spot price
+        
+        Returns:
+            Current spot price as float
+        """
+        # Implementation depends on your data source
+        # This is a placeholder - replace with actual spot price fetching
+        return 0.0
+
+    @rate_limited(limiter=None, key="get_nifty_spot")
+    def get_nifty_spot(self) -> float:
+        """
         Get the current NIFTY spot price
         
         Returns:
@@ -135,6 +147,17 @@ class DataHandler:
             # Return a default value in case of error
             return 18500.0
     
+    def get_nifty_spot(self) -> float:
+        """
+        Get current NIFTY spot price
+        
+        Returns:
+            Current spot price as float
+        """
+        # Implementation depends on your data source
+        # This is a placeholder - replace with actual spot price fetching
+        return 0.0
+
     @rate_limited(limiter=None, key="get_recent_nifty_data")
     def get_recent_nifty_data(self, interval_minutes: int = 5, days: int = 1) -> pd.DataFrame:
         """
@@ -270,6 +293,22 @@ class DataHandler:
             self.logger.error(f"Error getting NIFTY historical data: {e}")
             # Return an empty DataFrame in case of error
             return pd.DataFrame()
+    
+    def get_recent_nifty_data(self, interval_minutes: int, days: int) -> pd.DataFrame:
+        """
+        Get recent NIFTY OHLC data
+        
+        Args:
+            interval_minutes: Timeframe in minutes (1, 5, 15 etc)
+            days: Number of days of history to fetch
+            
+        Returns:
+            DataFrame with OHLC data
+        """
+        # Implementation depends on your data source
+        # This is a placeholder - replace with actual data fetching logic
+        columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+        return pd.DataFrame(columns=columns)
     
     @rate_limited(limiter=None, key="get_option_chain")
     def get_option_chain(self, expiry_date: date) -> Dict[str, Any]:
@@ -628,3 +667,29 @@ class DataHandler:
         """
         option_details = self.get_option_details(strike, option_type, expiry_date)
         return option_details.get('lastPrice', 0.0)
+
+    def get_market_data(self) -> Tuple[pd.DataFrame, float]:
+        """
+        Fetch market data including OHLC candles and current spot price
+        
+        Args:
+            None
+        
+        Returns:
+            Tuple of (DataFrame with market data, current spot price)
+        """
+        try:
+            # Get recent NIFTY data
+            interval_minutes = int(self.config.get('data', 'ohlc_timeframe', fallback='5'))
+            days = int(self.config.get('data', 'max_history_days', fallback='1'))
+            
+            df = self.get_recent_nifty_data(interval_minutes, days)
+            
+            # Get current spot price
+            spot_price = self.get_nifty_spot()
+            
+            return df, spot_price
+            
+        except Exception as e:
+            self.logger.error(f"Error getting market data: {e}")
+            raise
