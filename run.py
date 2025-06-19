@@ -27,29 +27,29 @@ def setup_argparse():
     )
     
     parser.add_argument(
-        "-m", "--mode", 
-        type=str, 
-        choices=["live", "simulation"], 
+        "--mode",
+        type=str,
+        choices=["simulation", "live"],
         default="simulation",
-        help="Trading mode: live or simulation (default: simulation)"
+        help="Run mode (simulation or live)"
     )
     
     parser.add_argument(
-        "-b", "--backtest", 
-        action="store_true", 
+        "--backtest",
+        action="store_true",
         help="Run in backtest mode"
     )
     
     parser.add_argument(
-        "--start-date", 
-        type=str, 
-        help="Start date for backtest (YYYY-MM-DD)"
+        "--start_date",
+        type=str,
+        help="Backtest start date (YYYY-MM-DD)"
     )
     
     parser.add_argument(
-        "--end-date", 
-        type=str, 
-        help="End date for backtest (YYYY-MM-DD)"
+        "--end_date",
+        type=str,
+        help="Backtest end date (YYYY-MM-DD)"
     )
     
     parser.add_argument(
@@ -73,7 +73,7 @@ def validate_args(args):
     # Check backtest arguments
     if args.backtest:
         if not args.start_date or not args.end_date:
-            print("Error: Both --start-date and --end-date are required for backtest mode")
+            print("Error: Both --start_date and --end_date are required for backtest mode")
             return False
         
         try:
@@ -99,13 +99,8 @@ def main():
         sys.exit(1)
     
     try:
-        # Initialize the strategy
-        strategy = NiftyOptionsStrategy(args.config)
-        
-        # Override mode if specified
-        if args.mode:
-            strategy.config.set('mode', 'live', 'true' if args.mode.lower() == 'live' else 'false')
-            strategy.config.set('mode', 'simulation', 'true' if args.mode.lower() == 'simulation' else 'false')
+        # Initialize strategy
+        strategy = NiftyOptionsStrategy(config_path=args.config, mode=args.mode)
         
         # Print status and exit if requested
         if args.status:
@@ -120,7 +115,7 @@ def main():
             sys.exit(0)
         
         # Start the strategy
-        print(f"Starting Nifty Options Algo in {strategy.config['mode']} mode...")
+        print(f"Starting Nifty Options Algo in {args.mode} mode...")
         strategy.start()
         
     except KeyboardInterrupt:
