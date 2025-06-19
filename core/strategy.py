@@ -51,16 +51,31 @@ class NiftyOptionsStrategy:
         
         # Setup logger
         log_level = self.config.get('logging', 'level', fallback='INFO')
+        log_to_file = self.config.getboolean('logging', 'log_to_file', fallback=False)
+        max_log_size = self.config.get('logging', 'max_log_size_mb', fallback='10')
+        backup_count = self.config.get('logging', 'backup_count', fallback='3')
         log_dir = self.config.get('logging', 'log_dir', fallback='logs')
-        self.logger = setup_logger(log_level, log_dir)
+
+        # Create logger config dict
+        logger_config = {
+            'level': log_level,
+            'log_to_file': log_to_file,
+            'max_log_size_mb': max_log_size,
+            'backup_count': backup_count
+        }
+
+        self.logger = setup_logger('nifty_options', logger_config, log_dir)
         
         # Log configuration
         self.logger.info(f"Loaded configuration from {config_path if config_path else 'default'}")
-        self.logger.info(f"Running in {self.config.get('mode', 'simulation')} mode")
+
+        # Get mode
+        self.mode = self.config.get('mode', 'live', fallback='simulation')
+        self.logger.info(f"Running in {self.mode} mode")
         
         # Initialize Dhan API client if available
         self.dhan_api = None
-        if DHANHQ_AVAILABLE and self.config.get('mode', 'simulation').lower() == 'live':
+        if DHANHQ_AVAILABLE and self.mode.lower() == 'live':
             try:
                 client_id = os.environ.get('DHAN_CLIENT_ID')
                 access_token = os.environ.get('DHAN_ACCESS_TOKEN')
@@ -301,7 +316,7 @@ class NiftyOptionsStrategy:
         
         return {
             "running": self.running,
-            "mode": self.config.get('mode', 'simulation'),
+            "mode": self.mode,
             "runtime_minutes": runtime,
             "iterations": self.iteration_count,
             "signals_generated": self.signal_count,

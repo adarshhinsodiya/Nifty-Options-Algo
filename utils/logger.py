@@ -1,16 +1,16 @@
 import logging
 import os
 from logging.handlers import RotatingFileHandler
-from typing import Optional
+from typing import Optional, Union
 
 
-def setup_logger(name: str, config: dict, log_dir: str = "logs") -> logging.Logger:
+def setup_logger(name: str, config: Union[str, dict] = 'INFO', log_dir: str = 'logs') -> logging.Logger:
     """
     Setup comprehensive logging with proper formatting
     
     Args:
         name: Name of the logger
-        config: Dictionary containing logging configuration
+        config: Either a string log level or a config dict with logging settings
         log_dir: Directory to store log files
         
     Returns:
@@ -19,8 +19,12 @@ def setup_logger(name: str, config: dict, log_dir: str = "logs") -> logging.Logg
     # Create logger
     logger = logging.getLogger(name)
     
-    # Get log level from config
-    log_level_str = config.get('level', 'INFO').upper()
+    # Handle both string and config dict input
+    if isinstance(config, str):
+        log_level_str = config.upper()
+    else:
+        log_level_str = config.get('level', 'INFO').upper()
+        
     log_level = getattr(logging, log_level_str, logging.INFO)
     logger.setLevel(log_level)
     
@@ -35,7 +39,7 @@ def setup_logger(name: str, config: dict, log_dir: str = "logs") -> logging.Logg
     logger.addHandler(console_handler)
     
     # Add file handler if enabled
-    if config.get('log_to_file', False):
+    if isinstance(config, dict) and config.get('log_to_file', False):
         # Create log directory if it doesn't exist
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
