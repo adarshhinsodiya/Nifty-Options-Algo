@@ -40,8 +40,9 @@ class ExecutionHandler:
         
         # Load execution parameters from config
         self.mode = config.get('mode', 'simulation').lower()
-        self.capital = float(config.get('capital', 100000))
-        self.max_positions = int(config.get('max_positions', 2))
+        self.capital = float(config.get('capital', 'initial_capital', fallback='100000'))
+        self.risk_percent = float(config.get('capital', 'risk_percent', fallback='0.01'))
+        self.max_positions = int(config.get('capital', 'max_positions', fallback='5'))
         self.position_size_pct = float(config.get('position_size_pct', 0.1))
         self.slippage_pct = float(config.get('slippage_pct', 0.01))
         
