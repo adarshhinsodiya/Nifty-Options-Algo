@@ -1,12 +1,13 @@
 import os
 import sys
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
 from typing import Optional, Dict, Any, List
 from dataclasses import asdict
 import logging
 from dotenv import load_dotenv
 import json
+import time
 
 # Add project root to Python path
 project_root = str(Path(__file__).parent.parent)
@@ -250,18 +251,28 @@ class NiftyOptionsStrategy:
     def _is_market_open(self) -> bool:
         """
         Check if market is currently open based on configured hours
+        
+        Returns:
+            True if market is open, False otherwise
         """
         try:
-            pre_market = int(self.config.get('market', 'pre_market_minutes', fallback='15'))
-            post_market = int(self.config.get('market', 'post_market_minutes', fallback='15'))
-            open_time = datetime.strptime(self.config.get('market', 'market_open_time', fallback='09:15'), '%H:%M').time()
-            close_time = datetime.strptime(self.config.get('market', 'market_close_time', fallback='15:30'), '%H:%M').time()
-            
+            # Get current time
             now = datetime.now().time()
-            pre_market_start = (datetime.combine(date.today(), open_time) - timedelta(minutes=pre_market)).time()
-            post_market_end = (datetime.combine(date.today(), close_time) + timedelta(minutes=post_market)).time()
             
-            return pre_market_start <= now <= post_market_end
+            # Parse market hours with fallbacks
+            open_time = datetime.strptime(
+                self.config.get('market', 'market_open_time', fallback='09:15'), 
+                '%H:%M'
+            ).time()
+            
+            close_time = datetime.strptime(
+                self.config.get('market', 'market_close_time', fallback='15:30'), 
+                '%H:%M'
+            ).time()
+            
+            # Check if current time is within market hours
+            return open_time <= now <= close_time
+            
         except Exception as e:
             self.logger.error(f"Error checking market hours: {e}")
             return False
@@ -315,4 +326,19 @@ class NiftyOptionsStrategy:
             "return_pct": position_summary["return_pct"],
             "today_pnl": position_summary["today_pnl"],
             "last_update": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+    
+    def get_state(self) -> dict:
+        """
+        Get current strategy state for saving
+        
+        Returns:
+            Dictionary containing strategy state
+        """
+        return {
+            "positions": [pos.__dict__ for pos in self.execution_handler.active_positions],
+            "iteration_count": self.iteration_count,
+            "signal_count": self.signal_count,
+            "trade_count": self.trade_count,
+            "last_updated": datetime.now().isoformat()
         }
