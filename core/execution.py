@@ -43,8 +43,8 @@ class ExecutionHandler:
         self.capital = float(config.get('capital', 'initial_capital', fallback='100000'))
         self.risk_percent = float(config.get('capital', 'risk_percent', fallback='0.01'))
         self.max_positions = int(config.get('capital', 'max_positions', fallback='5'))
-        self.position_size_pct = float(config.get('position_size_pct', 0.1))
-        self.slippage_pct = float(config.get('slippage_pct', 0.01))
+        self.position_size_pct = float(config.get('strategy', 'position_size_pct', fallback='0.1'))
+        self.slippage_pct = float(config.get('strategy', 'slippage_pct', fallback='0.01'))
         
         # Initialize positions list
         self.active_positions = []
