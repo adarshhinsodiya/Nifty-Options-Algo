@@ -8,20 +8,22 @@ class ConfigLoader:
     Configuration loader utility for loading and validating INI config files
     """
     
-    def __init__(self, config_file: str):
+    DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "default_config.ini")
+    
+    def __init__(self, config_file: Optional[str] = None):
         """
         Initialize the config loader with a config file path
         
         Args:
-            config_file: Path to the configuration file
+            config_file: Path to the configuration file (optional)
         """
-        self.config_file = config_file
+        self.config_file = config_file or self.DEFAULT_CONFIG_PATH
         self.config = configparser.ConfigParser()
         
-        if not os.path.exists(config_file):
-            raise FileNotFoundError(f"Configuration file not found: {config_file}")
+        if not os.path.exists(self.config_file):
+            raise FileNotFoundError(f"Configuration file not found: {self.config_file}")
             
-        self.config.read(config_file)
+        self.config.read(self.config_file)
     
     def get_section(self, section: str) -> Dict[str, Any]:
         """

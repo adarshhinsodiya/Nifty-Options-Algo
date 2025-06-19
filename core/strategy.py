@@ -1,22 +1,25 @@
-import pandas as pd
-import numpy as np
-import logging
 import os
-import time
-import json
+import sys
+from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Tuple, Union
+from typing import Optional, Dict, Any, List
+from dataclasses import asdict
+import logging
 from dotenv import load_dotenv
 
-# Import core modules
+# Add project root to Python path
+project_root = str(Path(__file__).parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# Now imports will work in all cases
 from core.data_handler import DataHandler
 from core.signal_generation import SignalGenerator
 from core.execution import ExecutionHandler
 from core.position import Position, TradeSignal
-
-# Import utilities
-from utils.logger import setup_logger
 from utils.config_loader import ConfigLoader
+from utils.logger import setup_logger
+from utils.rate_limit import rate_limited
 
 # Check if dhanhq is available
 try:
@@ -32,7 +35,7 @@ class NiftyOptionsStrategy:
     Main strategy class that orchestrates data handling, signal generation, and execution
     """
     
-    def __init__(self, config_path: str = None):
+    def __init__(self, config_path: Optional[str] = None):
         """
         Initialize the strategy
         
@@ -47,8 +50,8 @@ class NiftyOptionsStrategy:
         self.config = self.config_loader.config
         
         # Setup logger
-        log_level = self.config.get('log_level', 'INFO')
-        log_dir = self.config.get('log_dir', 'logs')
+        log_level = self.config.get('logging', 'level', fallback='INFO')
+        log_dir = self.config.get('logging', 'log_dir', fallback='logs')
         self.logger = setup_logger(log_level, log_dir)
         
         # Log configuration
