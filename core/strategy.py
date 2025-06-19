@@ -70,7 +70,7 @@ class NiftyOptionsStrategy:
         self.logger.info(f"Loaded configuration from {config_path if config_path else 'default'}")
 
         # Get mode
-        self.mode = self.config.get('mode', 'live', fallback='simulation')
+        self.mode = 'simulation' if self.config.get('mode', 'live', fallback='false').lower() == 'false' else self.config.get('mode', 'live', fallback='simulation')
         self.logger.info(f"Running in {self.mode} mode")
         
         # Initialize Dhan API client if available

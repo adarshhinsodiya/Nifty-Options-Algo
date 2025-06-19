@@ -42,11 +42,11 @@ class DataHandler:
         # Initialize cache
         self.cache = {}
         self.cache_timestamps = {}
-        self.cache_ttl = config.get('cache_ttl_seconds', 60)
-        self.max_cache_size = config.get('max_cache_size', 1000)
+        self.cache_ttl = int(self.config.get('data', 'cache_ttl_seconds', fallback='60'))
+        self.max_cache_size = int(self.config.get('data', 'max_cache_size', fallback='1000'))
         
         # Initialize rate limiter
-        throttle_ms = config.get('throttle_ms', 200)
+        throttle_ms = int(self.config.get('data', 'throttle_ms', fallback='200'))
         self.rate_limiter = RateLimiter(throttle_ms=throttle_ms)
     
     def _clean_cache(self) -> None:
@@ -414,11 +414,11 @@ class DataHandler:
             ref_date = ref_date.date()
         
         # Get expiry selection from config
-        expiry_selection = self.config.get('expiry_selection', 'weekly').lower()
+        expiry_selection = self.config.get('data', 'expiry_selection', fallback='weekly').lower()
         
         if expiry_selection == 'weekly':
             # Weekly expiry (usually Thursday)
-            weekly_expiry_day = self.config.get('weekly_expiry_day', 3)  # Thursday = 3
+            weekly_expiry_day = int(self.config.get('data', 'weekly_expiry_day', fallback='3'))  # Thursday = 3
             
             # Find the next expiry day (next Thursday)
             days_to_add = (weekly_expiry_day - ref_date.weekday()) % 7
@@ -433,7 +433,7 @@ class DataHandler:
             
         else:  # Monthly expiry
             # Monthly expiry (last Thursday of the month)
-            monthly_expiry_day = self.config.get('monthly_expiry_day', 25)
+            monthly_expiry_day = int(self.config.get('data', 'monthly_expiry_day', fallback='25'))
             
             # Get current month's expiry
             current_month = ref_date.replace(day=1)
@@ -487,7 +487,7 @@ class DataHandler:
             Selected strike price
         """
         # Get strike selection method from config
-        strike_selection = self.config.get('strike_selection', 'atm').lower()
+        strike_selection = self.config.get('data', 'strike_selection', fallback='atm').lower()
         
         # Round spot price to nearest 50
         atm_strike = round(spot_price / 50) * 50
@@ -498,7 +498,7 @@ class DataHandler:
         
         elif strike_selection == 'otm':
             # Out-of-the-money
-            otm_offset = int(self.config.get('otm_strike_offset', 1))
+            otm_offset = int(self.config.get('data', 'otm_strike_offset', fallback='1'))
             
             if option_type == 'CE':
                 # For calls, OTM is above spot
@@ -509,7 +509,7 @@ class DataHandler:
         
         elif strike_selection == 'itm':
             # In-the-money
-            itm_offset = int(self.config.get('itm_strike_offset', 1))
+            itm_offset = int(self.config.get('data', 'itm_strike_offset', fallback='1'))
             
             if option_type == 'CE':
                 # For calls, ITM is below spot
