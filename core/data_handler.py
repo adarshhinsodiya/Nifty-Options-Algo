@@ -8,6 +8,9 @@ from typing import Optional, Dict, Any, Tuple, List, Union
 import time as time_lib
 import json
 from collections import defaultdict
+from dotenv import load_dotenv
+from enum import Enum
+import random
 
 # Import utilities
 from utils.rate_limit import RateLimiter, rate_limited
@@ -30,38 +33,86 @@ class DataHandler:
         """
         Initialize the data handler
         
-        Args:
-            config: Configuration dictionary
-            dhan_api: DhanHQ API client instance (optional)
-            logger: Logger instance (optional)
+        This class is responsible for fetching and processing market data. It
+        takes a configuration dictionary, an optional DhanHQ API client
+        instance, and an optional logger as parameters.
+        
+        Parameters
+        ----------
+        config : Dict[str, Any]
+            The configuration dictionary. This contains the following keys:
+            
+            - 'data': This contains the following sub-keys:
+                - 'cache_ttl_seconds': The number of seconds to cache data
+                    before expiring it. Defaults to 60 seconds.
+                - 'max_cache_size': The maximum number of cache entries to
+                    store. Defaults to 1000.
+                - 'throttle_ms': The number of milliseconds to throttle API
+                    calls. Defaults to 200 ms.
+        dhan_api : Optional
+            An optional DhanHQ API client instance. If provided, this will be
+            used to fetch real-time market data.
+        logger : Optional
+            An optional logger instance. If provided, this will be used to log
+            messages.
         """
         self.config = config
         self.dhan_api = dhan_api
         self.logger = logger or logging.getLogger(__name__)
         
+        # Load environment variables from dhan_credentials.env
+        load_dotenv('.env')
+        
+        # Initialize Dhan API if not provided
+        if self.dhan_api is None and DHANHQ_AVAILABLE:
+            client_id = os.getenv('DHAN_CLIENT_ID')
+            access_token = os.getenv('DHAN_ACCESS_TOKEN')
+            if client_id and access_token:
+                self.dhan_api = dhanhq(client_id, access_token)
+            else:
+                self.logger.warning("Dhan API credentials missing in env file")
+        
         # Initialize cache
-        self.cache = {}
-        self.cache_timestamps = {}
-        self.cache_ttl = int(self.config.get('data', 'cache_ttl_seconds', fallback='60'))
-        self.max_cache_size = int(self.config.get('data', 'max_cache_size', fallback='1000'))
+        self.cache = {}  # Stores the actual data
+        self.cache_timestamps = {}  # Stores the timestamp of when each key was cached
+        self.cache_ttl = int(config.get('data', 'cache_ttl_seconds', fallback='60'))
+        self.max_cache_size = int(config.get('data', 'max_cache_size', fallback='1000'))
         
         # Initialize rate limiter
-        throttle_ms = int(self.config.get('data', 'throttle_ms', fallback='200'))
+        throttle_ms = int(config.get('data', 'throttle_ms', fallback='200'))
         self.rate_limiter = RateLimiter(throttle_ms=throttle_ms)
+        
     
     def _clean_cache(self) -> None:
         """
         Clean expired cache entries
+
+        This method is responsible for cleaning out expired cache entries. 
+
+        It does the following:
+
+        1. Iterate over all cached keys and check if they are expired
+        2. If a key is expired, add it to a list of expired keys
+        3. Remove all expired keys from the cache
+        4. If the cache is too large, sort all keys by timestamp (oldest first)
+        5. Remove the oldest entries until the cache is the correct size
+
+        Args:
+            None
+
+        Returns:
+            None
         """
         current_time = time_lib.time()
         expired_keys = []
         
-        # Find expired keys
+        # Iterate over all cached keys and check if they are expired
         for key, timestamp in self.cache_timestamps.items():
             if current_time - timestamp > self.cache_ttl:
+                # If a key is expired, add it to a list of expired keys
                 expired_keys.append(key)
         
-        # Remove expired keys
+        # Remove all expired keys from the cache
         for key in expired_keys:
             if key in self.cache:
                 del self.cache[key]
@@ -83,27 +134,53 @@ class DataHandler:
                     del self.cache[key]
                 if key in self.cache_timestamps:
                     del self.cache_timestamps[key]
-                    
-    @rate_limited(limiter=None, key="get_nifty_spot")
-    def get_nifty_spot(self) -> float:
+
+    def _validate_api_response(self, response: Any) -> bool:
         """
-        Get current NIFTY spot price
+        Validate API response structure
+
+        This method checks if the API response is valid by verifying the following conditions:
+        1. The response is not empty or None.
+        2. The response is a dictionary.
+        3. The 'status' key in the response dictionary is equal to 'success'.
+        4. The 'data' key exists in the response dictionary and is not empty.
+
+        If any of the above conditions are not met, the method returns False indicating an invalid response.
+        """
+        if not response or not isinstance(response, dict):
+            self.logger.debug("API response is not a dictionary or is None")
+            return False
         
-        Returns:
-            Current spot price as float
-        """
-        # Implementation depends on your data source
-        # This is a placeholder - replace with actual spot price fetching
-        return 0.0
+        if response.get('status') != 'success':
+            error_msg = response.get('message', 'Unknown error')
+            self.logger.debug(f"API response status is not success: {error_msg}")
+            return False
+            
+        # Additional validation for data structure
+        if 'data' not in response:
+            self.logger.debug("API response missing 'data' key")
+            return False
+            
+        return True
+        # If all the above checks pass, returns True indicating a valid response.
 
     @rate_limited(limiter=None, key="get_nifty_spot")
     def get_nifty_spot(self) -> float:
         """
         Get the current NIFTY spot price
         
+        This function fetches the current NIFTY spot price from the Dhan API if
+        available, or falls back to a simulated price if not.
+
+        The function first checks if the result is already cached. If it is, it
+        returns the cached value. If not, it fetches the price from the Dhan API
+        and caches the result. If the Dhan API is unavailable, it generates a
+        simulated price and caches that instead.
+
         Returns:
             Current NIFTY spot price
         """
+        
         # Use the instance rate limiter if none provided in decorator
         if not hasattr(self.get_nifty_spot, "_rate_limiter"):
             self.get_nifty_spot._rate_limiter = self.rate_limiter
@@ -118,21 +195,31 @@ class DataHandler:
         try:
             if self.dhan_api and DHANHQ_AVAILABLE:
                 # Get NIFTY spot price from Dhan API
-                response = self.dhan_api.get_quote("NIFTY", "IDX_I")
+                response = self.dhan_api.intraday_minute_data(
+                    security_id="13", 
+                    exchange_segment="IDX_I", 
+                    instrument_type="INDEX", 
+                    from_date="2025-06-19", 
+                    to_date="2025-06-19"
+                )
                 
                 if response and 'data' in response:
-                    spot_price = float(response['data']['ltp'])
+                    # Extract the spot price from the response
+                    spot_price = float(response['data']['close'][-1])
                     
                     # Cache the result
                     self.cache[cache_key] = spot_price
                     self.cache_timestamps[cache_key] = time_lib.time()
                     
+                    # Return the spot price
                     return spot_price
                 else:
+                    # Log an error if the Dhan API returned an unexpected response
                     self.logger.error(f"Failed to get NIFTY spot price: {response}")
             
-            # Fallback to simulation mode
+            # Fallback to simulation mode if Dhan API unavailable
             self.logger.warning("Using simulated NIFTY spot price")
+            
             # Generate a realistic NIFTY price (around 18000-19000)
             simulated_price = 18500 + (np.random.random() * 500)
             
@@ -140,29 +227,28 @@ class DataHandler:
             self.cache[cache_key] = simulated_price
             self.cache_timestamps[cache_key] = time_lib.time()
             
+            # Return the simulated spot price
             return simulated_price
             
         except Exception as e:
+            # Log an error if an exception was raised
             self.logger.error(f"Error getting NIFTY spot price: {e}")
             # Return a default value in case of error
             return 18500.0
-    
-    def get_nifty_spot(self) -> float:
-        """
-        Get current NIFTY spot price
-        
-        Returns:
-            Current spot price as float
-        """
-        # Implementation depends on your data source
-        # This is a placeholder - replace with actual spot price fetching
-        return 0.0
 
     @rate_limited(limiter=None, key="get_recent_nifty_data")
-    def get_recent_nifty_data(self, interval_minutes: int = 5, days: int = 1) -> pd.DataFrame:
+    def get_recent_nifty_data(self, interval_minutes: int = 1, days: int = 1) -> pd.DataFrame:  
         """
         Get recent NIFTY price data
         
+        This function fetches recent NIFTY price data from the DhanHQ API if
+        available, or falls back to simulated data if not.
+
+        The function first checks if the result is already cached. If it is, it
+        returns the cached value. If not, it fetches the price data from the
+        DhanHQ API and caches the result. If the DhanHQ API is unavailable, it
+        generates simulated price data and caches that instead.
+
         Args:
             interval_minutes: Candle interval in minutes
             days: Number of days of historical data to fetch
@@ -174,41 +260,46 @@ class DataHandler:
         if not hasattr(self.get_recent_nifty_data, "_rate_limiter"):
             self.get_recent_nifty_data._rate_limiter = self.rate_limiter
         
+        # Generate a unique cache key based on the interval and days
         cache_key = f"nifty_data_{interval_minutes}_{days}"
+        
+        # Clean expired cache entries
         self._clean_cache()
         
-        # Return cached value if available
+        # Check if data is present in cache and return it if available
         if cache_key in self.cache:
             return self.cache[cache_key]
         
         try:
+            # Check if DhanHQ API is available and instantiated
             if self.dhan_api and DHANHQ_AVAILABLE:
-                # Calculate date range
+                # Calculate the date range for the historical data
                 end_date = datetime.now()
                 start_date = end_date - timedelta(days=days)
                 
-                # Format dates for API
+                # Format dates as strings for API request
                 start_str = start_date.strftime("%Y-%m-%d")
                 end_str = end_date.strftime("%Y-%m-%d")
                 
-                # Get historical data from Dhan API
-                response = self.dhan_api.get_historical_data(
-                    "NIFTY", 
-                    "IDX_I", 
-                    start_str, 
-                    end_str, 
-                    f"{interval_minutes}m"
+                # Fetch historical data from DhanHQ API
+                response = self.dhan_api.intraday_minute_data(
+                    security_id="13", 
+                    exchange_segment="IDX_I", 
+                    instrument_type="INDEX", 
+                    from_date="2025-06-19", 
+                    to_date="2025-06-19"
                 )
                 
+                # Check if response contains data
                 if response and 'data' in response:
-                    # Convert to DataFrame
+                    # Convert response data to a DataFrame
                     df = pd.DataFrame(response['data'])
                     
-                    # Process DataFrame
+                    # Convert 'timestamp' column to datetime type and sort the DataFrame
                     df['timestamp'] = pd.to_datetime(df['timestamp'])
                     df = df.sort_values('timestamp')
                     
-                    # Rename columns to standard OHLCV format
+                    # Rename columns to match standard OHLCV format
                     df = df.rename(columns={
                         'open': 'Open',
                         'high': 'High',
@@ -218,41 +309,43 @@ class DataHandler:
                         'timestamp': 'Date'
                     })
                     
-                    # Set index to timestamp
+                    # Set 'Date' as the DataFrame index
                     df = df.set_index('Date')
                     
-                    # Cache the result
+                    # Cache the DataFrame result
                     self.cache[cache_key] = df
                     self.cache_timestamps[cache_key] = time_lib.time()
                     
                     return df
                 else:
+                    # Log an error if the response does not contain expected data
                     self.logger.error(f"Failed to get NIFTY historical data: {response}")
             
-            # Fallback to simulation mode
+            # If DhanHQ API is not available, simulate data
             self.logger.warning("Using simulated NIFTY historical data")
             
-            # Generate simulated data
+            # Generate simulated date range based on interval and days
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
             
-            # Create date range
+            # Create a date range with specified interval
             date_range = pd.date_range(
                 start=start_date,
                 end=end_date,
                 freq=f"{interval_minutes}min"
             )
             
-            # Generate random walk prices
+            # Initialize parameters for simulated price generation
             base_price = 18500
             price_volatility = 50
             
-            # Generate OHLCV data
+            # Prepare a list to hold simulated OHLCV data
             data = []
             prev_close = base_price
             
+            # Iterate over each datetime in the date range
             for dt in date_range:
-                # Skip non-market hours (9:15 AM to 3:30 PM)
+                # Skip times outside market hours (9:15 AM to 3:30 PM)
                 if dt.time() < time(9, 15) or dt.time() > time(15, 30):
                     continue
                 
@@ -260,7 +353,7 @@ class DataHandler:
                 if dt.weekday() > 4:  # 5 = Saturday, 6 = Sunday
                     continue
                 
-                # Generate candle data
+                # Simulate OHLCV (Open, High, Low, Close, Volume) data
                 change = np.random.normal(0, price_volatility)
                 close = prev_close + change
                 high = close + abs(np.random.normal(0, price_volatility/2))
@@ -268,6 +361,7 @@ class DataHandler:
                 open_price = prev_close + np.random.normal(0, price_volatility/4)
                 volume = int(np.random.normal(1000000, 500000))
                 
+                # Append the simulated data to the list
                 data.append({
                     'Date': dt,
                     'Open': max(open_price, low),
@@ -277,240 +371,162 @@ class DataHandler:
                     'Volume': max(0, volume)
                 })
                 
+                # Update previous close with current close for next iteration
                 prev_close = close
             
-            # Create DataFrame
+            # Convert the list of simulated data to a DataFrame
             df = pd.DataFrame(data)
             df = df.set_index('Date')
             
-            # Cache the result
+            # Cache the simulated DataFrame result
             self.cache[cache_key] = df
             self.cache_timestamps[cache_key] = time_lib.time()
             
             return df
             
         except Exception as e:
+            # Log any exception that occurs during data fetching
             self.logger.error(f"Error getting NIFTY historical data: {e}")
-            # Return an empty DataFrame in case of error
+            # Return an empty DataFrame in case of an error
             return pd.DataFrame()
     
-    def get_recent_nifty_data(self, interval_minutes: int, days: int) -> pd.DataFrame:
-        """
-        Get recent NIFTY OHLC data
-        
-        Args:
-            interval_minutes: Timeframe in minutes (1, 5, 15 etc)
-            days: Number of days of history to fetch
-            
-        Returns:
-            DataFrame with OHLC data
-        """
-        # Implementation depends on your data source
-        # This is a placeholder - replace with actual data fetching logic
-        columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
-        return pd.DataFrame(columns=columns)
-    
     @rate_limited(limiter=None, key="get_option_chain")
-    def get_option_chain(self, expiry_date: date) -> Dict[str, Any]:
+    def get_option_chain(self, expiry_date: date) -> Optional[pd.DataFrame]:
         """
-        Get NIFTY option chain for a specific expiry date
-        
+        Get NIFTY option chain data
+
+        This method retrieves the option chain data for NIFTY by following these steps:
+        1. Checks if the Dhan API is available and connects to it if necessary.
+        2. If the Dhan API is available, calls the option chain method to retrieve the option chain data.
+        3. If the API call is successful, parses the response into a pandas DataFrame.
+        4. Standardizes column names in the DataFrame.
+        5. Returns the retrieved option chain data, or None if the data could not be retrieved.
+
         Args:
-            expiry_date: Expiry date for the options
-            
+            expiry_date: The expiry date for the option chain.
+
         Returns:
-            Dictionary with option chain data
+            Optional[pd.DataFrame]: The retrieved option chain data, or None if the data could not be retrieved.
         """
-        # Use the instance rate limiter if none provided in decorator
-        if not hasattr(self.get_option_chain, "_rate_limiter"):
-            self.get_option_chain._rate_limiter = self.rate_limiter
-        
-        expiry_str = expiry_date.strftime("%Y-%m-%d")
-        cache_key = f"option_chain_{expiry_str}"
-        self._clean_cache()
-        
-        # Return cached value if available
-        if cache_key in self.cache:
-            return self.cache[cache_key]
-        
         try:
-            if self.dhan_api and DHANHQ_AVAILABLE:
-                # Get option chain from Dhan API
-                response = self.dhan_api.get_option_chain("NIFTY", expiry_str)
+            # Step 1: Check if the Dhan API is available and connect to it if necessary
+            if not self.dhan_api and DHANHQ_AVAILABLE:
+                client_id = os.getenv('DHAN_CLIENT_ID')
+                access_token = os.getenv('DHAN_ACCESS_TOKEN')
+                if client_id and access_token:
+                    self.dhan_api = dhanhq(client_id, access_token)
+
+            # Step 2: If the Dhan API is available, call the option chain method
+            if self.dhan_api:
+                self.rate_limit_check()
                 
-                if response and 'data' in response:
-                    option_chain = response['data']
+                expiry_str = expiry_date.strftime("%Y-%m-%d")
+                cache_key = f"option_chain_{expiry_str}"
+                self._clean_cache()
+                
+                # Return cached value if available
+                if cache_key in self.cache:
+                    return self.cache[cache_key]
+                
+                # Call the option chain method
+                chain_response = self.dhan_api.option_chain(
+                    under_security_id=13,  # NIFTY ID
+                    under_exchange_segment=ExchangeSegment.INDEX.value,
+                    expiry=expiry_str
+                )
+
+                # Step 3: If the API call is successful, parse the response
+                if self._validate_api_response(chain_response):
+                    data = chain_response.get('data', {}).get('data', {}).get('oc', {})
+                    if not data:
+                        self.logger.error("No option chain data in response")
+                        return None
                     
-                    # Cache the result
-                    self.cache[cache_key] = option_chain
+                    # Flatten data into DataFrame
+                    rows = []
+                    for strike, strike_data in data.items():
+                        strike_float = f"{float(strike):.6f}"
+                        for option_type, option_data in strike_data.items():
+                            rows.append({
+                                'strike': strike_float,
+                                'type': option_type.strip().lower(),
+                                'last_price': option_data.get('last_price', 0),
+                                'volume': option_data.get('total_traded_volume', 0),
+                                'oi': option_data.get('open_interest', 0),
+                                'bid_price': option_data.get('bid_price', 0),
+                                'ask_price': option_data.get('ask_price', 0),
+                                'implied_volatility': option_data.get('implied_volatility', 0)
+                            })
+                    
+                    if not rows:
+                        self.logger.error("No option data found after parsing")
+                        return None
+                    
+                    # Create and process DataFrame
+                    df = pd.DataFrame(rows)
+                    numeric_cols = ['last_price', 'volume', 'oi', 'bid_price', 'ask_price', 'implied_volatility']
+                    for col in numeric_cols:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                    df.fillna(0, inplace=True)
+                    
+                    # Cache the DataFrame result
+                    self.cache[cache_key] = df
                     self.cache_timestamps[cache_key] = time_lib.time()
                     
-                    return option_chain
+                    return df
                 else:
-                    self.logger.error(f"Failed to get option chain: {response}")
-            
-            # Fallback to simulation mode
-            self.logger.warning("Using simulated option chain data")
-            
-            # Get current NIFTY spot price
-            spot_price = self.get_nifty_spot()
-            
-            # Round to nearest 50
-            atm_strike = round(spot_price / 50) * 50
-            
-            # Generate strikes (±1000 points from ATM)
-            strikes = range(atm_strike - 1000, atm_strike + 1050, 50)
-            
-            # Generate option chain
-            option_chain = {
-                'spotPrice': spot_price,
-                'timestamp': datetime.now().isoformat(),
-                'expiryDate': expiry_str,
-                'calls': {},
-                'puts': {}
-            }
-            
-            for strike in strikes:
-                # Calculate theoretical prices based on Black-Scholes approximation
-                days_to_expiry = (expiry_date - date.today()).days
-                if days_to_expiry < 1:
-                    days_to_expiry = 1
-                
-                time_to_expiry = days_to_expiry / 365.0
-                volatility = 0.2  # 20% annualized volatility
-                
-                # Simplified pricing model
-                call_itm = max(0, spot_price - strike)
-                put_itm = max(0, strike - spot_price)
-                
-                # Time value approximation
-                time_value = spot_price * volatility * np.sqrt(time_to_expiry)
-                
-                # Final prices
-                call_price = call_itm + (time_value * np.exp(-0.5 * ((strike - spot_price) / (spot_price * volatility))**2))
-                put_price = put_itm + (time_value * np.exp(-0.5 * ((spot_price - strike) / (spot_price * volatility))**2))
-                
-                # Generate volume and open interest
-                base_volume = max(100, int(10000 * np.exp(-0.5 * ((strike - spot_price) / 200)**2)))
-                base_oi = max(500, int(50000 * np.exp(-0.5 * ((strike - spot_price) / 300)**2)))
-                
-                # Add random variation
-                call_volume = int(base_volume * (0.8 + 0.4 * np.random.random()))
-                put_volume = int(base_volume * (0.8 + 0.4 * np.random.random()))
-                call_oi = int(base_oi * (0.8 + 0.4 * np.random.random()))
-                put_oi = int(base_oi * (0.8 + 0.4 * np.random.random()))
-                
-                # Create option data
-                option_chain['calls'][strike] = {
-                    'strike': strike,
-                    'lastPrice': round(call_price, 1),
-                    'change': round(np.random.normal(0, call_price * 0.03), 1),
-                    'volume': call_volume,
-                    'openInterest': call_oi,
-                    'bidPrice': round(call_price * 0.98, 1),
-                    'askPrice': round(call_price * 1.02, 1),
-                    'impliedVolatility': round(volatility * (0.8 + 0.4 * np.random.random()), 2)
-                }
-                
-                option_chain['puts'][strike] = {
-                    'strike': strike,
-                    'lastPrice': round(put_price, 1),
-                    'change': round(np.random.normal(0, put_price * 0.03), 1),
-                    'volume': put_volume,
-                    'openInterest': put_oi,
-                    'bidPrice': round(put_price * 0.98, 1),
-                    'askPrice': round(put_price * 1.02, 1),
-                    'impliedVolatility': round(volatility * (0.8 + 0.4 * np.random.random()), 2)
-                }
-            
-            # Cache the result
-            self.cache[cache_key] = option_chain
-            self.cache_timestamps[cache_key] = time_lib.time()
-            
-            return option_chain
-            
+                    self.logger.error("Invalid API response for option chain")
+                    return None
+            else:
+                self.logger.error("Dhan API not available")
+                return None
+
         except Exception as e:
             self.logger.error(f"Error getting option chain: {e}")
-            # Return an empty dictionary in case of error
-            return {'calls': {}, 'puts': {}, 'spotPrice': self.get_nifty_spot()}
+            return None
     
     def get_current_and_next_expiry(self, ref_date: Union[str, pd.Timestamp]) -> Tuple[date, date]:
         """
-        Determine the current and next expiry dates based on a given reference date
-        
+        Determine the current and next expiry dates based on a given reference date.
+
         Args:
-            ref_date: Reference date from which expiry dates are calculated
-            
+            ref_date (str or pd.Timestamp): The reference date from which expiry dates are calculated.
+
         Returns:
-            Tuple containing the current and next expiry dates
+            Tuple[date, date]: A tuple containing the current and next expiry dates.
         """
-        # Convert reference date to datetime if it's a string
+        # Convert the reference date to a date object if it's in string format
         if isinstance(ref_date, str):
-            ref_date = pd.Timestamp(ref_date)
-        
-        # Convert to date if it's a timestamp
-        if isinstance(ref_date, pd.Timestamp):
+            ref_date = pd.to_datetime(ref_date).date()
+        # Convert the reference date to a date object if it's a timestamp
+        elif isinstance(ref_date, pd.Timestamp):
             ref_date = ref_date.date()
-        
-        # Get expiry selection from config
-        expiry_selection = self.config.get('data', 'expiry_selection', fallback='weekly').lower()
-        
-        if expiry_selection == 'weekly':
-            # Weekly expiry (usually Thursday)
-            weekly_expiry_day = int(self.config.get('data', 'weekly_expiry_day', fallback='3'))  # Thursday = 3
-            
-            # Find the next expiry day (next Thursday)
-            days_to_add = (weekly_expiry_day - ref_date.weekday()) % 7
-            if days_to_add == 0:  # If today is Thursday
-                # If it's past market hours, use next week
-                current_time = datetime.now().time()
-                if current_time > time(15, 30):  # Past 3:30 PM
-                    days_to_add = 7
-            
-            current_expiry = ref_date + timedelta(days=days_to_add)
-            next_expiry = current_expiry + timedelta(days=7)
-            
-        else:  # Monthly expiry
-            # Monthly expiry (last Thursday of the month)
-            monthly_expiry_day = int(self.config.get('data', 'monthly_expiry_day', fallback='25'))
-            
-            # Get current month's expiry
-            current_month = ref_date.replace(day=1)
-            next_month = (current_month + timedelta(days=32)).replace(day=1)
-            
-            # Find last Thursday of current month
-            last_day = (next_month - timedelta(days=1)).day
-            current_expiry = None
-            
-            for day in range(min(monthly_expiry_day, last_day), 0, -1):
-                test_date = ref_date.replace(day=day)
-                if test_date.weekday() == 3:  # Thursday
-                    current_expiry = test_date
-                    break
-            
-            # If we've passed this month's expiry, use next month
-            if current_expiry < ref_date:
-                current_month = next_month
-                next_month = (current_month + timedelta(days=32)).replace(day=1)
-                
-                # Find last Thursday of next month
-                last_day = (next_month - timedelta(days=1)).day
-                for day in range(min(monthly_expiry_day, last_day), 0, -1):
-                    test_date = current_month.replace(day=day)
-                    if test_date.weekday() == 3:  # Thursday
-                        current_expiry = test_date
-                        break
-            
-            # Find last Thursday of the month after next
-            last_day = ((next_month + timedelta(days=32)).replace(day=1) - timedelta(days=1)).day
-            next_expiry = None
-            
-            for day in range(min(monthly_expiry_day, last_day), 0, -1):
-                test_date = next_month.replace(day=day)
-                if test_date.weekday() == 3:  # Thursday
-                    next_expiry = test_date
-                    break
-        
+
+        # Get expiry day from config (default to Thursday = 3)
+        self.expiry_day = int(self.config.get('data', 'weekly_expiry_day', fallback='3'))
+
+        # This logic correctly finds the next upcoming expiry date.
+        # It calculates the number of days ahead to reach the expiry day
+        # (e.g. Thursday) and then adds that number of days to the reference date.
+        days_ahead = (self.expiry_day - ref_date.weekday() + 7) % 7
+        # If today is Thursday (days_ahead=0), we want next Thursday (7 days ahead)
+        if days_ahead == 0:
+            days_ahead = 7
+        # Determine the current expiry date by adding the calculated days to the reference date
+        current_expiry = ref_date + timedelta(days=days_ahead)
+        # Determine the next expiry date, which is one week after the current expiry
+        next_expiry = current_expiry + timedelta(weeks=1)
+
+        # Store the calculated current expiry date for later use
+        self.current_expiry = current_expiry
+        # Store the calculated next expiry date for later use
+        self.next_expiry = next_expiry
+        # Format the current expiry date as a string for logging purposes
+        self.expiry_string = self.current_expiry.strftime('%Y-%m-%d')
+        # Log the calculated expiry date for reference
+        self.logger.info(f"Trading expiry date set to: {self.expiry_string}")
+
+        # Return the tuple of current and next expiry dates
         return current_expiry, next_expiry
     
     def select_option_strike(self, option_type: str, spot_price: float, expiry_date: date) -> int:
@@ -548,7 +564,7 @@ class DataHandler:
         
         elif strike_selection == 'itm':
             # In-the-money
-            itm_offset = int(self.config.get('data', 'itm_strike_offset', fallback='1'))
+            itm_offset = int(self.config.get('data', 'itm_strike_offset', fallback='2'))
             
             if option_type == 'CE':
                 # For calls, ITM is below spot
@@ -604,19 +620,26 @@ class DataHandler:
         
         # Get option data based on type
         if option_type == 'CE':
-            options_data = option_chain.get('calls', {})
+            options_data = option_chain[option_chain['type'] == 'ce']
         else:  # PE
-            options_data = option_chain.get('puts', {})
+            options_data = option_chain[option_chain['type'] == 'pe']
         
         # Get specific strike data
-        strike_data = options_data.get(strike, {})
+        strike_data = options_data[options_data['strike'] == strike]
         
-        if not strike_data:
+        if not strike_data.empty:
+            # Add symbol and type information
+            strike_data['symbol'] = self.get_option_symbol(strike, option_type, expiry_date)
+            strike_data['type'] = option_type
+            strike_data['expiryDate'] = expiry_date.strftime("%Y-%m-%d")
+            
+            return strike_data.to_dict(orient='records')[0]
+        else:
             # If strike not found, generate simulated data
             self.logger.warning(f"Strike {strike} {option_type} not found in option chain, using simulated data")
             
             # Get spot price
-            spot_price = option_chain.get('spotPrice', self.get_nifty_spot())
+            spot_price = self.get_nifty_spot()
             
             # Calculate days to expiry
             days_to_expiry = max(1, (expiry_date - date.today()).days)
@@ -637,19 +660,17 @@ class DataHandler:
             # Create simulated data
             strike_data = {
                 'strike': strike,
-                'lastPrice': round(price, 1),
+                'last_price': round(price, 1),
                 'change': round(np.random.normal(0, price * 0.03), 1),
                 'volume': int(1000 * np.random.random()),
-                'openInterest': int(5000 * np.random.random()),
-                'bidPrice': round(price * 0.98, 1),
-                'askPrice': round(price * 1.02, 1),
-                'impliedVolatility': round(volatility * (0.8 + 0.4 * np.random.random()), 2)
+                'oi': int(5000 * np.random.random()),
+                'bid_price': round(price * 0.98, 1),
+                'ask_price': round(price * 1.02, 1),
+                'implied_volatility': round(volatility * (0.8 + 0.4 * np.random.random()), 2),
+                'symbol': self.get_option_symbol(strike, option_type, expiry_date),
+                'type': option_type,
+                'expiryDate': expiry_date.strftime("%Y-%m-%d")
             }
-        
-        # Add symbol and type information
-        strike_data['symbol'] = self.get_option_symbol(strike, option_type, expiry_date)
-        strike_data['type'] = option_type
-        strike_data['expiryDate'] = expiry_date.strftime("%Y-%m-%d")
         
         return strike_data
     
@@ -666,7 +687,7 @@ class DataHandler:
             Current option price
         """
         option_details = self.get_option_details(strike, option_type, expiry_date)
-        return option_details.get('lastPrice', 0.0)
+        return option_details.get('last_price', 0.0)
 
     def get_market_data(self) -> Tuple[pd.DataFrame, float]:
         """
@@ -693,3 +714,11 @@ class DataHandler:
         except Exception as e:
             self.logger.error(f"Error getting market data: {e}")
             raise
+
+class ExchangeSegment(Enum):
+    """Enum for exchange segments"""
+    EQUITY = "EQUITY"
+    DERIVATIVE = "FNO"
+    CURRENCY = "CDS"
+    COMMODITY = "COMM"
+    INDEX = "IDX_I"
