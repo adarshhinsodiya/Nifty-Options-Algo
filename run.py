@@ -104,7 +104,8 @@ def main():
         
         # Override mode if specified
         if args.mode:
-            strategy.config['mode'] = args.mode
+            strategy.config.set('mode', 'live', 'true' if args.mode.lower() == 'live' else 'false')
+            strategy.config.set('mode', 'simulation', 'true' if args.mode.lower() == 'simulation' else 'false')
         
         # Print status and exit if requested
         if args.status:

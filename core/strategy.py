@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any, List
 from dataclasses import asdict
 import logging
 from dotenv import load_dotenv
+import json
 
 # Add project root to Python path
 project_root = str(Path(__file__).parent.parent)
@@ -141,30 +142,24 @@ class NiftyOptionsStrategy:
     
     def stop(self) -> None:
         """
-        Stop the strategy and perform cleanup
+        Stop the strategy and save state
         """
         self.running = False
-        self.end_time = datetime.now()
+        self.logger.info("Strategy stopping...")
         
-        # Close all open positions
-        self._close_all_positions()
-        
-        # Export positions to CSV
-        data_dir = self.config.get('data_dir', 'data')
-        os.makedirs(data_dir, exist_ok=True)
-        positions_file = os.path.join(data_dir, f"positions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
-        self.execution_handler.export_positions_to_csv(positions_file)
-        
-        # Log summary
-        duration = (self.end_time - self.start_time).total_seconds() / 60 if self.start_time else 0
-        summary = self.execution_handler.get_position_summary()
-        
-        self.logger.info(f"Strategy stopped at {self.end_time}")
-        self.logger.info(f"Duration: {duration:.2f} minutes")
-        self.logger.info(f"Iterations: {self.iteration_count}")
-        self.logger.info(f"Signals generated: {self.signal_count}")
-        self.logger.info(f"Trades executed: {self.trade_count}")
-        self.logger.info(f"P&L summary: {summary}")
+        try:
+            # Ensure data directory exists
+            data_dir = self.config.get('data', 'data_dir', fallback='data')
+            os.makedirs(data_dir, exist_ok=True)
+            
+            # Save strategy state
+            state_file = os.path.join(data_dir, 'strategy_state.json')
+            with open(state_file, 'w') as f:
+                json.dump(self.get_state(), f)
+                
+            self.logger.info(f"Strategy state saved to {state_file}")
+        except Exception as e:
+            self.logger.error(f"Error saving strategy state: {e}")
     
     def _run_iteration(self) -> None:
         """
@@ -254,31 +249,22 @@ class NiftyOptionsStrategy:
     
     def _is_market_open(self) -> bool:
         """
-        Check if the market is currently open
-        
-        Returns:
-            True if market is open, False otherwise
+        Check if market is currently open based on configured hours
         """
-        # Get current time in India timezone
-        now = datetime.now()
-        
-        # Check if it's a weekday (0=Monday, 4=Friday)
-        if now.weekday() > 4:  # Weekend
+        try:
+            pre_market = int(self.config.get('market', 'pre_market_minutes', fallback='15'))
+            post_market = int(self.config.get('market', 'post_market_minutes', fallback='15'))
+            open_time = datetime.strptime(self.config.get('market', 'market_open_time', fallback='09:15'), '%H:%M').time()
+            close_time = datetime.strptime(self.config.get('market', 'market_close_time', fallback='15:30'), '%H:%M').time()
+            
+            now = datetime.now().time()
+            pre_market_start = (datetime.combine(date.today(), open_time) - timedelta(minutes=pre_market)).time()
+            post_market_end = (datetime.combine(date.today(), close_time) + timedelta(minutes=post_market)).time()
+            
+            return pre_market_start <= now <= post_market_end
+        except Exception as e:
+            self.logger.error(f"Error checking market hours: {e}")
             return False
-        
-        # Check market hours (9:15 AM to 3:30 PM)
-        market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
-        market_close = now.replace(hour=15, minute=30, second=0, microsecond=0)
-        
-        # Allow pre-market preparation
-        pre_market = int(self.config.get('pre_market_minutes', 15))
-        market_open = market_open - timedelta(minutes=pre_market)
-        
-        # Allow post-market cleanup
-        post_market = int(self.config.get('post_market_minutes', 15))
-        market_close = market_close + timedelta(minutes=post_market)
-        
-        return market_open <= now <= market_close
     
     def backtest(self, start_date: str, end_date: str) -> Dict[str, Any]:
         """
