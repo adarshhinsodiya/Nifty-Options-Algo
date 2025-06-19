@@ -30,7 +30,7 @@ def setup_argparse():
         "--mode",
         type=str,
         choices=["simulation", "live"],
-        default="simulation",
+        default="live",
         help="Run mode (simulation or live)"
     )
     
