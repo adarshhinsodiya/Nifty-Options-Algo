@@ -139,64 +139,6 @@ class SignalGenerator:
 
         return None, None
     
-    def analyze_technical_indicators(self, df: pd.DataFrame) -> Dict[str, float]:
-        """
-        Analyze technical indicators in the price data
-        
-        Args:
-            df: DataFrame with OHLCV price data
-            
-        Returns:
-            Dictionary of detected signals and their confidence scores
-        """
-        signals = {}
-        
-        # Ensure we have enough data
-        if len(df) < 20:
-            self.logger.warning("Not enough data for technical analysis")
-            return signals
-        
-        # Calculate moving averages
-        df['SMA5'] = df['Close'].rolling(window=5).mean()
-        df['SMA20'] = df['Close'].rolling(window=20).mean()
-        
-        # Calculate RSI
-        delta = df['Close'].diff()
-        gain = delta.where(delta > 0, 0)
-        loss = -delta.where(delta < 0, 0)
-        avg_gain = gain.rolling(window=14).mean()
-        avg_loss = loss.rolling(window=14).mean()
-        rs = avg_gain / avg_loss
-        df['RSI'] = 100 - (100 / (1 + rs))
-        
-        # Get the last values
-        last_row = df.iloc[-1]
-        prev_row = df.iloc[-2] if len(df) > 1 else None
-        
-        # Detect moving average crossover (bullish)
-        if prev_row is not None and prev_row['SMA5'] <= prev_row['SMA20'] and last_row['SMA5'] > last_row['SMA20']:
-            # Calculate confidence based on the strength of the crossover
-            crossover_strength = (last_row['SMA5'] - last_row['SMA20']) / last_row['SMA20']
-            confidence = min(1.0, crossover_strength * 100)
-            signals['ma_crossover_bullish'] = confidence
-        
-        # Detect moving average crossover (bearish)
-        if prev_row is not None and prev_row['SMA5'] >= prev_row['SMA20'] and last_row['SMA5'] < last_row['SMA20']:
-            # Calculate confidence based on the strength of the crossover
-            crossover_strength = (last_row['SMA20'] - last_row['SMA5']) / last_row['SMA20']
-            confidence = min(1.0, crossover_strength * 100)
-            signals['ma_crossover_bearish'] = confidence
-        
-        # Detect RSI overbought/oversold
-        if last_row['RSI'] > 70:
-            confidence = min(1.0, (last_row['RSI'] - 70) / 30)
-            signals['rsi_overbought'] = confidence
-        elif last_row['RSI'] < 30:
-            confidence = min(1.0, (30 - last_row['RSI']) / 30)
-            signals['rsi_oversold'] = confidence
-        
-        return signals
-    
     def generate_signals(self, df: pd.DataFrame, spot_price: float) -> List[TradeSignal]:
         """
         Generate trading signals based on price data analysis
@@ -210,85 +152,19 @@ class SignalGenerator:
         """
         signals = []
         
-        # Analyze candle patterns
-        patterns = {}
-        
-        # Analyze technical indicators
-        indicators = self.analyze_technical_indicators(df)
-        
-        # Combine patterns and indicators
-        all_signals = {**patterns, **indicators}
-        
-        # Log detected patterns and indicators
-        if patterns:
-            self.logger.info(f"Detected patterns: {patterns}")
-        if indicators:
-            self.logger.info(f"Detected indicators: {indicators}")
-        
-        # Generate signals based on the strategy
-        if self.strategy_name == 'candle_pattern':
-            # Bullish signals
-            bullish_patterns = ['bullish_engulfing', 'hammer', 'morning_star', 'ma_crossover_bullish', 'rsi_oversold']
-            bullish_confidence = 0.0
-            for pattern in bullish_patterns:
-                if pattern in all_signals and all_signals[pattern] > bullish_confidence:
-                    bullish_confidence = all_signals[pattern]
+        # Analyze latest candle patterns
+        candle_signal_type, candle_signal = self.analyze_candle_pattern(df, -1)
+        if candle_signal:
+            signals.append(candle_signal)
             
-            # Bearish signals
-            bearish_patterns = ['bearish_engulfing', 'shooting_star', 'evening_star', 'ma_crossover_bearish', 'rsi_overbought']
-            bearish_confidence = 0.0
-            for pattern in bearish_patterns:
-                if pattern in all_signals and all_signals[pattern] > bearish_confidence:
-                    bearish_confidence = all_signals[pattern]
-            
-            # Generate signals if confidence is above threshold
-            timestamp = datetime.now()
-            
-            if bullish_confidence > self.confidence_threshold:
-                # Bullish signal - buy put options
-                entry_price = spot_price
-                stop_loss = entry_price * (1 + self.stop_loss_pct)
-                take_profit = entry_price * (1 - self.take_profit_pct)
-                
-                signal = TradeSignal(
-                    signal_type="BUY_PUT",
-                    entry_price=entry_price,
-                    stop_loss=stop_loss,
-                    take_profit=take_profit,
-                    strike=0,  # Will be determined by execution module
-                    option_type="PE",
-                    timestamp=timestamp,
-                    spot_price=spot_price,
-                    confidence=bullish_confidence
-                )
-                
-                signals.append(signal)
-                self.add_signal_to_history(signal)
-                self.logger.info(f"Generated bullish signal: {signal}")
-            
-            if bearish_confidence > self.confidence_threshold:
-                # Bearish signal - buy call options
-                entry_price = spot_price
-                stop_loss = entry_price * (1 - self.stop_loss_pct)
-                take_profit = entry_price * (1 + self.take_profit_pct)
-                
-                signal = TradeSignal(
-                    signal_type="BUY_CALL",
-                    entry_price=entry_price,
-                    stop_loss=stop_loss,
-                    take_profit=take_profit,
-                    strike=0,  # Will be determined by execution module
-                    option_type="CE",
-                    timestamp=timestamp,
-                    spot_price=spot_price,
-                    confidence=bearish_confidence
-                )
-                
-                signals.append(signal)
-                self.add_signal_to_history(signal)
-                self.logger.info(f"Generated bearish signal: {signal}")
+        # Filter signals based on strategy rules
+        filtered_signals = self.filter_signals(signals)
         
-        return signals
+        # Log generated signals
+        if filtered_signals:
+            self.logger.info(f"Generated {len(filtered_signals)} signals")
+            
+        return filtered_signals
     
     def filter_signals(self, signals: List[TradeSignal]) -> List[TradeSignal]:
         """
@@ -300,22 +176,28 @@ class SignalGenerator:
         Returns:
             Filtered list of signals
         """
+        if not signals:
+            return []
+            
         filtered_signals = []
         
         for signal in signals:
-            # Skip signals with low confidence
-            if signal.confidence < self.confidence_threshold:
+            # Skip signals that don't meet minimum requirements
+            if not all([signal.signal_type, signal.entry_price > 0, signal.strike > 0]):
                 continue
-            
-            # Check for duplicate signals (same type within a short time window)
+                
+            # Check for recent similar signals
             is_duplicate = False
-            for hist_signal in self.signal_history[-10:]:  # Check last 10 signals
-                time_diff = (signal.timestamp - hist_signal.timestamp).total_seconds()
-                if time_diff < 300 and signal.signal_type == hist_signal.signal_type:  # 5 minutes
+            for hist_signal in self.signal_history[-5:]:  # Check last 5 signals
+                if (
+                    signal.signal_type == hist_signal.signal_type and
+                    (signal.timestamp - hist_signal.timestamp).total_seconds() < 3600  # 1 hour
+                ):
                     is_duplicate = True
                     break
-            
+                    
             if not is_duplicate:
                 filtered_signals.append(signal)
+                self.add_signal_to_history(signal)
         
         return filtered_signals

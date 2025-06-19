@@ -15,9 +15,9 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Now imports will work in all cases
-from core.data_handler import DataHandler
-from core.signal_generation import SignalGenerator
-from core.execution import ExecutionHandler
+from .signal_generation import SignalGenerator
+from .data_handler import DataHandler
+from .execution import ExecutionHandler
 from core.position import Position, TradeSignal
 from utils.config_loader import ConfigLoader
 from utils.logger import setup_logger
@@ -97,9 +97,10 @@ class NiftyOptionsStrategy:
         
         # Initialize strategy state
         self.running = False
-        self.last_signal_time = datetime.now() - timedelta(hours=1)
-        self.last_data_fetch_time = datetime.now() - timedelta(minutes=5)
+        self.last_data_fetch_time = datetime.now() - timedelta(days=1)  # Force first fetch
         self.last_summary_time = datetime.now() - timedelta(minutes=5)
+        self.df = None
+        self.spot_price = None
         
         # Initialize performance tracking
         self.start_time = None
@@ -117,7 +118,8 @@ class NiftyOptionsStrategy:
         self.logger.info(f"Strategy started at {self.start_time}")
         
         try:
-            # Main strategy loop
+            interval_seconds = int(self.config.get('config', 'check_interval_seconds', fallback='60'))
+            
             while self.running:
                 self.iteration_count += 1
                 
@@ -130,14 +132,11 @@ class NiftyOptionsStrategy:
                 # Run one iteration of the strategy
                 self._run_iteration()
                 
-                # Sleep for the specified interval
-                interval_seconds = int(self.config.get('check_interval_seconds', 60))
                 time.sleep(interval_seconds)
                 
-        except KeyboardInterrupt:
-            self.logger.info("Strategy interrupted by user")
         except Exception as e:
             self.logger.error(f"Error in strategy: {e}", exc_info=True)
+            raise
         finally:
             self.stop()
     
@@ -166,87 +165,31 @@ class NiftyOptionsStrategy:
         """
         Run one iteration of the strategy
         """
-        current_time = datetime.now()
-        
-        # Fetch market data
-        if (current_time - self.last_data_fetch_time).total_seconds() >= int(self.config.get('data_fetch_interval_seconds', 60)):
-            self._fetch_market_data()
-            self.last_data_fetch_time = current_time
-        
-        # Update existing positions
-        self.execution_handler.update_positions()
-        
-        # Generate signals
-        if (current_time - self.last_signal_time).total_seconds() >= int(self.config.get('signal_interval_seconds', 300)):
-            self._generate_and_execute_signals()
-            self.last_signal_time = current_time
-        
-        # Log position summary
-        if (current_time - self.last_summary_time).total_seconds() >= int(self.config.get('summary_interval_seconds', 300)):
-            summary = self.execution_handler.get_position_summary()
-            self.logger.info(f"Position summary: {summary}")
-            self.last_summary_time = current_time
+        try:
+            # Fetch data if needed
+            fetch_interval = int(self.config.get('config', 'data_fetch_interval_seconds', fallback='60'))
+            if (datetime.now() - self.last_data_fetch_time).total_seconds() >= fetch_interval:
+                self._fetch_market_data()
+                self.last_data_fetch_time = datetime.now()
+
+            # Generate and execute signals
+            signals = self.signal_generator.generate_signals(self.df, self.spot_price)
+            self.execution_handler.execute_signals(signals)
+            
+        except Exception as e:
+            self.logger.error(f"Error in strategy iteration: {e}")
+            raise
     
     def _fetch_market_data(self) -> None:
         """
-        Fetch and update market data
+        Fetch market data from data handler
         """
         try:
-            # Get NIFTY spot price
-            spot_price = self.data_handler.get_nifty_spot()
-            self.logger.debug(f"NIFTY spot price: {spot_price}")
-            
-            # Get recent NIFTY data
-            interval_minutes = int(self.config.get('candle_interval_minutes', 5))
-            days = int(self.config.get('historical_days', 1))
-            
-            df = self.data_handler.get_recent_nifty_data(interval_minutes, days)
-            self.logger.debug(f"Fetched {len(df)} candles of NIFTY data")
-            
+            self.df, self.spot_price = self.data_handler.get_market_data()
+            self.logger.info(f"Fetched market data with {len(self.df)} records")
         except Exception as e:
             self.logger.error(f"Error fetching market data: {e}")
-    
-    def _generate_and_execute_signals(self) -> None:
-        """
-        Generate signals and execute trades
-        """
-        try:
-            # Get recent NIFTY data
-            interval_minutes = int(self.config.get('candle_interval_minutes', 5))
-            days = int(self.config.get('historical_days', 1))
-            df = self.data_handler.get_recent_nifty_data(interval_minutes, days)
-            
-            if df.empty:
-                self.logger.warning("No data available for signal generation")
-                return
-            
-            # Get current spot price
-            spot_price = self.data_handler.get_nifty_spot()
-            
-            # Generate signals
-            signals = self.signal_generator.generate_signals(df, spot_price)
-            
-            # Filter signals
-            filtered_signals = self.signal_generator.filter_signals(signals)
-            
-            self.signal_count += len(filtered_signals)
-            
-            # Execute signals
-            for signal in filtered_signals:
-                position = self.execution_handler.execute_signal(signal)
-                if position:
-                    self.trade_count += 1
-            
-        except Exception as e:
-            self.logger.error(f"Error generating or executing signals: {e}")
-    
-    def _close_all_positions(self) -> None:
-        """
-        Close all open positions
-        """
-        for position in self.execution_handler.active_positions[:]:
-            self.logger.info(f"Closing position {position.id} on strategy stop")
-            self.execution_handler.close_position(position, exit_reason="STRATEGY_STOP")
+            raise
     
     def _is_market_open(self) -> bool:
         """
