@@ -3,6 +3,7 @@ import numpy as np
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Tuple, Union
+import configparser
 
 # Import position dataclass
 from core.position import TradeSignal
@@ -14,26 +15,36 @@ class SignalGenerator:
     and technical indicators
     """
     
-    def __init__(self, config: Dict[str, Any], logger=None):
+    def __init__(self, config: configparser.ConfigParser, logger: Optional[logging.Logger] = None):
         """
         Initialize the signal generator
         
         Args:
-            config: Configuration dictionary
+            config: Configuration parser
             logger: Logger instance (optional)
         """
-        self.config = config
         self.logger = logger or logging.getLogger(__name__)
         
+        # Get strategy configuration
+        self.strategy_name = config.get('strategy', 'strategy_name', fallback='candle_pattern')
+        self.min_volume = int(config.get('strategy', 'min_volume_filter', fallback='1000'))
+        self.volatility_threshold = float(config.get('strategy', 'volatility_threshold', fallback='0.05'))
+        
+        # Initialize technical indicators
+        self.indicators = {
+            'rsi': False,
+            'macd': False,
+            'bollinger': False
+        }
+        
         # Load strategy parameters from config
-        self.strategy_name = config.get('strategy_name', 'candle_pattern')
-        self.confidence_threshold = float(config.get('confidence_threshold', 0.7))
-        self.stop_loss_pct = float(config.get('stop_loss_pct', 0.3))
-        self.take_profit_pct = float(config.get('take_profit_pct', 0.6))
+        self.confidence_threshold = float(config.get('strategy', 'confidence_threshold', fallback='0.7'))
+        self.stop_loss_pct = float(config.get('strategy', 'stop_loss_pct', fallback='0.3'))
+        self.take_profit_pct = float(config.get('strategy', 'take_profit_pct', fallback='0.6'))
         
         # Initialize signal history
         self.signal_history = []
-        self.max_history_size = int(config.get('max_signal_history', 100))
+        self.max_history_size = int(config.get('strategy', 'max_signal_history', fallback='100'))
     
     def add_signal_to_history(self, signal: TradeSignal) -> None:
         """
@@ -48,92 +59,85 @@ class SignalGenerator:
         if len(self.signal_history) > self.max_history_size:
             self.signal_history = self.signal_history[-self.max_history_size:]
     
-    def analyze_candle_patterns(self, df: pd.DataFrame) -> Dict[str, float]:
+    def analyze_candle_pattern(self, df: pd.DataFrame, index: int) -> Tuple[Optional[str], Optional[TradeSignal]]:
         """
-        Analyze candle patterns in the price data
-        
-        Args:
-            df: DataFrame with OHLCV price data
-            
-        Returns:
-            Dictionary of detected patterns and their confidence scores
+        Analyze 2-candle pattern (previous + current) for trading signals.
         """
-        patterns = {}
-        
-        # Ensure we have enough data
-        if len(df) < 5:
-            self.logger.warning("Not enough data for pattern analysis")
-            return patterns
-        
-        # Get the most recent candles
-        recent_candles = df.iloc[-5:].copy()
-        
-        # Calculate candle properties
-        recent_candles['body_size'] = abs(recent_candles['Close'] - recent_candles['Open'])
-        recent_candles['upper_shadow'] = recent_candles['High'] - recent_candles[['Open', 'Close']].max(axis=1)
-        recent_candles['lower_shadow'] = recent_candles[['Open', 'Close']].min(axis=1) - recent_candles['Low']
-        recent_candles['range'] = recent_candles['High'] - recent_candles['Low']
-        recent_candles['body_pct'] = recent_candles['body_size'] / recent_candles['range']
-        recent_candles['is_bullish'] = recent_candles['Close'] > recent_candles['Open']
-        
-        # Get the last candle
-        last_candle = recent_candles.iloc[-1]
-        prev_candle = recent_candles.iloc[-2] if len(recent_candles) > 1 else None
-        
-        # Detect bullish engulfing pattern
-        if prev_candle is not None and not prev_candle['is_bullish'] and last_candle['is_bullish']:
-            if last_candle['Open'] <= prev_candle['Close'] and last_candle['Close'] >= prev_candle['Open']:
-                confidence = min(1.0, last_candle['body_size'] / (prev_candle['body_size'] * 1.2))
-                patterns['bullish_engulfing'] = confidence
-        
-        # Detect bearish engulfing pattern
-        if prev_candle is not None and prev_candle['is_bullish'] and not last_candle['is_bullish']:
-            if last_candle['Open'] >= prev_candle['Close'] and last_candle['Close'] <= prev_candle['Open']:
-                confidence = min(1.0, last_candle['body_size'] / (prev_candle['body_size'] * 1.2))
-                patterns['bearish_engulfing'] = confidence
-        
-        # Detect hammer pattern (bullish)
-        if last_candle['lower_shadow'] >= 2 * last_candle['body_size'] and last_candle['upper_shadow'] < 0.5 * last_candle['body_size']:
-            confidence = min(1.0, last_candle['lower_shadow'] / (last_candle['body_size'] * 3))
-            patterns['hammer'] = confidence
-        
-        # Detect shooting star pattern (bearish)
-        if last_candle['upper_shadow'] >= 2 * last_candle['body_size'] and last_candle['lower_shadow'] < 0.5 * last_candle['body_size']:
-            confidence = min(1.0, last_candle['upper_shadow'] / (last_candle['body_size'] * 3))
-            patterns['shooting_star'] = confidence
-        
-        # Detect doji pattern (indecision)
-        if last_candle['body_size'] < 0.1 * last_candle['range']:
-            confidence = 1.0 - (last_candle['body_size'] / (0.1 * last_candle['range']))
-            patterns['doji'] = confidence
-        
-        # Detect morning star pattern (bullish)
-        if len(recent_candles) >= 3:
-            c1 = recent_candles.iloc[-3]
-            c2 = recent_candles.iloc[-2]
-            c3 = last_candle
+        if index < 0:
+            index = len(df) + index
+        if index >= len(df) or index < 1:
+            self.logger.debug("Not enough candles for analysis")
+            return None, None
+
+        try:
+            current = df.iloc[index]
+            prev = df.iloc[index - 1]
+        except IndexError:
+            self.logger.error("Invalid index for current or previous candle")
+            return None, None
+
+        for candle in [current, prev]:
+            if any(pd.isna(x) for x in [candle['open'], candle['close'], candle['high'], candle['low']]):
+                self.logger.error("Missing candle data")
+                return None, None
+
+        prev_body = abs(prev['close'] - prev['open'])
+        prev_range = prev['high'] - prev['low']
+        if prev_range == 0:
+            self.logger.error("Prev candle range is zero")
+            return None, None
+
+        if prev['close'] < prev['open']:
+            prev_top_wick = prev['high'] - prev['open']
+            prev_bottom_wick = prev['close'] - prev['low']
+        else:
+            prev_top_wick = prev['high'] - prev['close']
+            prev_bottom_wick = prev['open'] - prev['low']
             
-            if not c1['is_bullish'] and c1['body_pct'] > 0.6 and \
-               c2['body_pct'] < 0.3 and \
-               c3['is_bullish'] and c3['body_pct'] > 0.6 and \
-               c3['Close'] > (c1['Open'] + c1['Close']) / 2:
-                confidence = min(1.0, c3['body_size'] / c1['body_size'])
-                patterns['morning_star'] = confidence
+        signal_type = None
+        entry_price = current['open']
         
-        # Detect evening star pattern (bearish)
-        if len(recent_candles) >= 3:
-            c1 = recent_candles.iloc[-3]
-            c2 = recent_candles.iloc[-2]
-            c3 = last_candle
-            
-            if c1['is_bullish'] and c1['body_pct'] > 0.6 and \
-               c2['body_pct'] < 0.3 and \
-               not c3['is_bullish'] and c3['body_pct'] > 0.6 and \
-               c3['Close'] < (c1['Open'] + c1['Close']) / 2:
-                confidence = min(1.0, c3['body_size'] / c1['body_size'])
-                patterns['evening_star'] = confidence
-        
-        return patterns
+        if (
+            prev['close'] < prev['open'] and
+            (prev_top_wick > prev_body) and
+            (prev_top_wick > prev_bottom_wick) and
+            (current['low'] < prev['low']) and
+            (current['close'] > prev['open']) and
+            (current['close'] > current['open'])
+        ):
+            signal_type = "LONG"
+
+        # SHORT signal conditions
+        elif (
+            prev['close'] > prev['open'] and
+            (prev_bottom_wick > prev_body) and
+            (prev_bottom_wick > prev_top_wick) and
+            (current['high'] > prev['high']) and
+            (current['close'] < prev['open']) and
+            (current['close'] < current['open'])
+        ):
+            signal_type = "SHORT"
+
+        if signal_type:
+            risk = abs(entry_price - prev['low']) if signal_type == "LONG" else abs(entry_price - prev['high'])
+            profit_target = risk * 1.5
+            take_profit = entry_price + profit_target if signal_type == "LONG" else entry_price - profit_target
+            strike = int(round(prev['close'] / self.strike_step) * self.strike_step)
+            option_type = "ce" if signal_type == "LONG" else "pe"
+            timestamp = datetime.now(self.ist_tz)
+
+            return signal_type, TradeSignal(
+                signal_type=signal_type,
+                entry_price=entry_price,
+                stop_loss=prev['low'] if signal_type == "LONG" else prev['high'],
+                take_profit=take_profit,
+                strike=strike,
+                option_type=option_type,
+                timestamp=timestamp,
+                spot_price=entry_price
+            )
+
+        return None, None
     
     def analyze_technical_indicators(self, df: pd.DataFrame) -> Dict[str, float]:
         """
@@ -207,7 +211,7 @@ class SignalGenerator:
         signals = []
         
         # Analyze candle patterns
-        patterns = self.analyze_candle_patterns(df)
+        patterns = {}
         
         # Analyze technical indicators
         indicators = self.analyze_technical_indicators(df)
