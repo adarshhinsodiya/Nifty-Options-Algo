@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional, Tuple, Union
 import configparser
 
@@ -42,7 +42,7 @@ class SignalGenerator:
         self.stop_loss_pct = float(config.get('strategy', 'stop_loss_pct', fallback='0.3'))
         self.take_profit_pct = float(config.get('strategy', 'take_profit_pct', fallback='0.6'))
         self.strike_step = float(config.get('strategy', 'strike_step', fallback='50.0'))
-        self.ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+        self.ist_tz = timezone(timedelta(hours=5, minutes=30))
         
         # Initialize signal history
         self.signal_history = []

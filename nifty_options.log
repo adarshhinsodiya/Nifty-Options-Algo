@@ -363,3 +363,27 @@ ValueError: Failed to get NIFTY spot price from API
 2025-06-20 12:14:43,483 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
 2025-06-20 12:14:44,019 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
 2025-06-20 12:14:44,130 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:15:44,157 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 12:15:45,190 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:15:45,297 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:17:42,542 - nifty_options - INFO - Running in live mode
+2025-06-20 12:17:42,543 - nifty_options - INFO - DhanHQ API client initialized successfully
+2025-06-20 12:17:42,543 - root - ERROR - Error: type object 'datetime.datetime' has no attribute 'timezone'
+Traceback (most recent call last):
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\run.py", line 146, in main
+    strategy = NiftyOptionsStrategy(config_path=args.config, mode=args.mode)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\strategy.py", line 87, in __init__
+    self.signal_generator = SignalGenerator(self.config, self.logger)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\signal_generation.py", line 45, in __init__
+    self.ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+                  ^^^^^^^^^^^^^^^^^
+AttributeError: type object 'datetime.datetime' has no attribute 'timezone'. Did you mean: 'astimezone'?
+2025-06-20 12:18:30,100 - nifty_options - INFO - Running in live mode
+2025-06-20 12:18:30,101 - nifty_options - INFO - DhanHQ API client initialized successfully
+2025-06-20 12:18:30,102 - nifty_options - INFO - Strategy started at 2025-06-20 12:18:30.102507
+2025-06-20 12:18:30,105 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.dhan.co:443
+2025-06-20 12:18:30,610 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:18:30,719 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:18:30,735 - nifty_options - INFO - Successfully fetched initial market data
