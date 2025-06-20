@@ -5,6 +5,7 @@ import uuid
 import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Tuple, Union
+from dotenv import load_dotenv
 
 # Import position dataclasses and enums
 from core.position import Position, TradeSignal, OrderType, TransactionType, ProductType, ExchangeSegment
@@ -25,18 +26,33 @@ class ExecutionHandler:
     
     def __init__(self, config: Dict[str, Any], data_handler=None, dhan_api=None, logger=None):
         """
-        Initialize the execution handler
-        
-        Args:
-            config: Configuration dictionary
-            data_handler: DataHandler instance for market data
-            dhan_api: DhanHQ API client instance (optional)
-            logger: Logger instance (optional)
+        Initialize execution handler
         """
         self.config = config
         self.data_handler = data_handler
-        self.dhan_api = dhan_api
         self.logger = logger or logging.getLogger(__name__)
+        
+        # Load environment variables
+        load_dotenv()
+        
+        # Initialize Dhan API if not provided
+        if dhan_api is None and DHANHQ_AVAILABLE:
+            client_id = os.getenv('DHAN_CLIENT_ID')
+            access_token = os.getenv('DHAN_ACCESS_TOKEN')
+            if client_id and access_token:
+                self.logger.debug(f"Initializing DhanHQ API with client ID: {client_id[:4]}...")
+                try:
+                    dhan_api = dhanhq(client_id, access_token)
+                    self.logger.debug("DhanHQ API initialized successfully")
+                except Exception as e:
+                    self.logger.error(f"Failed to initialize Dhan API: {str(e)}")
+                    raise
+            else:
+                self.logger.error("Dhan API credentials missing in env file")
+        else:
+            dhan_api = dhan_api
+        
+        self.dhan_api = dhan_api
         
         # Load execution parameters from config
         self.mode = config.get('mode', 'simulation').lower()
