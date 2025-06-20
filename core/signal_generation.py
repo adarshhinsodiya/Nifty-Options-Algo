@@ -55,6 +55,47 @@ class SignalGenerator:
         Args:
             signal: Trade signal to add
         """
+        # Print signal details to console
+        signal_str = (
+            f"New Signal: {signal.signal_type} | "
+            f"Strike: {signal.strike} | "
+            f"Entry: {signal.entry_price:.2f} | "
+            f"SL: {signal.stop_loss:.2f} | "
+            f"TP: {signal.take_profit:.2f}"
+        )
+        print(signal_str)
+        self.logger.info(signal_str)
+        
+        # Save to JSON file
+        signal_dict = {
+            'timestamp': signal.timestamp.isoformat(),
+            'signal_type': signal.signal_type,
+            'entry_price': signal.entry_price,
+            'stop_loss': signal.stop_loss,
+            'take_profit': signal.take_profit,
+            'strike': signal.strike,
+            'option_type': signal.option_type,
+            'spot_price': signal.spot_price
+        }
+        
+        import json
+        import os
+        log_file = os.path.join('logs', 'signals.json')
+        os.makedirs('logs', exist_ok=True)
+        
+        # Read existing signals if file exists
+        existing_signals = []
+        if os.path.exists(log_file):
+            with open(log_file, 'r') as f:
+                existing_signals = json.load(f)
+        
+        # Append new signal
+        existing_signals.append(signal_dict)
+        
+        # Write back to file
+        with open(log_file, 'w') as f:
+            json.dump(existing_signals, f, indent=2)
+        
         self.signal_history.append(signal)
         
         # Trim history if needed
