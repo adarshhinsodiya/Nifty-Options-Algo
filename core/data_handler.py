@@ -77,10 +77,22 @@ class DataHandler:
         if self.dhan_api is None and DHANHQ_AVAILABLE:
             client_id = os.getenv('DHAN_CLIENT_ID')
             access_token = os.getenv('DHAN_ACCESS_TOKEN')
+            
+            self.logger.debug(f"Environment variables loaded - Client ID exists: {bool(client_id)}, Access Token exists: {bool(access_token)}")
+            
             if client_id and access_token:
-                self.dhan_api = dhanhq(client_id, access_token)
+                self.logger.debug(f"Initializing DhanHQ API with client ID: {client_id[:4]}...")
+                try:
+                    self.dhan_api = dhanhq(client_id, access_token)
+                    # Test API connection
+                    test_response = self.dhan_api.get_holdings()
+                    self.logger.debug(f"API test response: {test_response}")
+                    self.logger.debug("DhanHQ API initialized and tested successfully")
+                except Exception as e:
+                    self.logger.error(f"Failed to initialize Dhan API: {str(e)}")
+                    raise
             else:
-                self.logger.warning("Dhan API credentials missing in env file")
+                self.logger.error("Dhan API credentials missing in env file")
         
     
     def _clean_cache(self) -> None:
@@ -137,43 +149,34 @@ class DataHandler:
 
     def _validate_api_response(self, response: Any) -> bool:
         """
-        Validate API response structure
-
-        This method checks if the API response is valid by verifying the following conditions:
-        1. The response is not empty or None.
-        2. The response is a dictionary.
-        3. The 'status' key in the response dictionary is equal to 'success'.
-        4. The 'data' key exists in the response dictionary and is not empty.
-
-        If any of the above conditions are not met, the method returns False indicating an invalid response.
+        Validate API response structure with detailed error messages
         """
-        if not response or not isinstance(response, dict):
-            self.logger.debug("API response is not a dictionary or is None")
-            return False
-        
-        if response.get('status') != 'success':
-            error_msg = response.get('message', 'Unknown error')
-            self.logger.debug(f"API response status is not success: {error_msg}")
+        if not response:
+            self.logger.error("API returned empty response")
             return False
             
-        # Additional validation for data structure
-        if 'data' not in response:
-            self.logger.error("API response missing 'data' key")
+        if not isinstance(response, dict):
+            self.logger.error(f"API response is not a dictionary: {type(response)}")
             return False
             
-        # Check if data contains actual market data
-        if not response['data']:
-            self.logger.error("API returned empty data")
+        if 'status' not in response or response['status'] != 'success':
+            self.logger.error(f"API returned unsuccessful status: {response.get('status')}")
             return False
             
-        # Check for required OHLC fields in first data point
-        first_item = response['data'][0] if isinstance(response['data'], list) else response['data']
-        if not all(field in first_item for field in ['open', 'high', 'low', 'close']):
-            self.logger.error("API data missing required OHLC fields")
+        if 'data' not in response or not response['data']:
+            self.logger.error("API response missing data field")
+            return False
+            
+        # Additional validation for intraday minute data
+        if not all(key in response['data'] for key in ['open', 'high', 'low', 'close']):
+            self.logger.error("API response missing required OHLC fields")
+            return False
+            
+        if not response['data']['close']:
+            self.logger.error("No closing prices in API response")
             return False
             
         return True
-        # If all the above checks pass, returns True indicating a valid response.
 
     @rate_limited(limiter=lambda self: self.rate_limiter, key="get_nifty_spot")
     def get_nifty_spot(self) -> float:
@@ -203,22 +206,21 @@ class DataHandler:
                 security_id=13,
                 exchange_segment=ExchangeSegment.INDEX.value,
                 instrument_type='INDEX',
-                from_date="2025-06-20",
-                to_date="2025-06-20"
+                from_date=datetime.now().strftime("%Y-%m-%d"),
+                to_date=datetime.now().strftime("%Y-%m-%d")
             )
+            # print(response)
             
             if self._validate_api_response(response):
-                data = response.get('data', {}).get('data', [])
-                if data and len(data) > 0:
-                    latest = data[-1]
-                    spot_price = latest.get('close', 0)
-                    self.cache[cache_key] = spot_price
+                # Get the latest data point from the OHLC data
+                latest_close = response['data'].get('close', [])[-1] if response['data'].get('close') else None
+                
+                if latest_close is not None:
+                    self.cache[cache_key] = latest_close
                     self.cache_timestamps[cache_key] = time_lib.time()
-                    
-                    # Return the spot price
-                    return spot_price
-            
-            self.logger.error("Failed to get NIFTY spot price from API")
+                    return latest_close
+                
+            self.logger.error(f"Failed to get NIFTY spot price from API. Response: {response}")
             raise ValueError("Failed to get NIFTY spot price from API")
             
         except Exception as e:
@@ -272,25 +274,20 @@ class DataHandler:
                 # Check if response contains data
                 if response and 'data' in response:
                     # Convert response data to a DataFrame
-                    df = pd.DataFrame(response['data'])
+                    data = response['data']
                     
-                    # Convert 'timestamp' column to datetime type and sort the DataFrame
-                    df['timestamp'] = pd.to_datetime(df['timestamp'])
-                    df = df.sort_values('timestamp')
+                    # Convert timestamps to proper datetime index
+                    timestamps = [datetime.fromtimestamp(ts) for ts in data['timestamp']]
+                    df = pd.DataFrame({
+                        'open': data['open'],
+                        'high': data['high'],
+                        'low': data['low'],
+                        'close': data['close'],
+                        'volume': data['volume']
+                    }, index=pd.to_datetime(timestamps))
                     
-                    # Rename columns to match standard OHLCV format
-                    # Ensure we use lowercase column names as expected by signal generator
-                    df = df.rename(columns={
-                        'open': 'open',
-                        'high': 'high',
-                        'low': 'low',
-                        'close': 'close',
-                        'volume': 'volume',
-                        'timestamp': 'date'
-                    })
-                    
-                    # Set 'date' as the DataFrame index
-                    df = df.set_index('date')
+                    # Sort by date (oldest first)
+                    df = df.sort_index()
                     
                     # Cache the DataFrame result
                     self.cache[cache_key] = df
@@ -591,7 +588,7 @@ class DataHandler:
         """
         try:
             # Get recent NIFTY data
-            interval_minutes = int(self.config.get('data', 'ohlc_timeframe', fallback='5'))
+            interval_minutes = int(self.config.get('data', 'ohlc_timeframe', fallback='1'))
             days = int(self.config.get('data', 'max_history_days', fallback='1'))
             
             df = self.get_recent_nifty_data(interval_minutes, days)
@@ -599,7 +596,7 @@ class DataHandler:
             # Get current spot price
             spot_price = self.get_nifty_spot()
             
-            print(df.head())
+            print(df)
             print(spot_price)
             
             return df, spot_price

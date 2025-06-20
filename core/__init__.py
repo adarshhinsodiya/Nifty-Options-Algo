@@ -9,6 +9,18 @@ Contains main trading modules:
 - position: Data classes and enums
 """
 
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('nifty_options.log'),
+        logging.StreamHandler()
+    ]
+)
+
 from .data_handler import DataHandler
 from .signal_generation import SignalGenerator
 from .execution import ExecutionHandler

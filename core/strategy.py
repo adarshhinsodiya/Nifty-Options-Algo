@@ -171,8 +171,8 @@ class NiftyOptionsStrategy:
             # Fetch market data with retry logic
             self._fetch_market_data()
             
-            # Generate signals only if we have valid market data
-            signals = self.signal_generator.generate_signals(self.df)
+            # Generate signals with both dataframe and spot price
+            signals = self.signal_generator.generate_signals(self.df, self.spot_price)
             
             if signals:
                 self.logger.info(f"Generated {len(signals)} signals")

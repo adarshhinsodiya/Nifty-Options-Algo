@@ -1,0 +1,196 @@
+2025-06-20 11:06:13,478 - nifty_options - INFO - Running in live mode
+2025-06-20 11:06:13,479 - nifty_options - INFO - DhanHQ API client initialized successfully
+2025-06-20 11:06:13,479 - nifty_options - INFO - Strategy started at 2025-06-20 11:06:13.479284
+2025-06-20 11:06:13,482 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.dhan.co:443
+2025-06-20 11:06:13,992 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:06:14,076 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:06:14,082 - nifty_options - ERROR - Failed to get NIFTY spot price from API
+2025-06-20 11:06:14,083 - nifty_options - ERROR - Error getting NIFTY spot price: Failed to get NIFTY spot price from API
+2025-06-20 11:06:14,084 - nifty_options - ERROR - Error getting market data: Failed to get NIFTY spot price from API
+2025-06-20 11:06:14,085 - nifty_options - WARNING - Failed to fetch market data (attempt 1/5): Failed to get NIFTY spot price from API
+2025-06-20 11:06:14,086 - nifty_options - INFO - Retrying in 5 seconds...
+2025-06-20 11:06:19,133 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:06:19,135 - nifty_options - ERROR - Failed to get NIFTY spot price from API
+2025-06-20 11:06:19,136 - nifty_options - ERROR - Error getting NIFTY spot price: Failed to get NIFTY spot price from API
+2025-06-20 11:06:19,137 - nifty_options - ERROR - Error getting market data: Failed to get NIFTY spot price from API
+2025-06-20 11:06:19,137 - nifty_options - WARNING - Failed to fetch market data (attempt 2/5): Failed to get NIFTY spot price from API
+2025-06-20 11:06:19,138 - nifty_options - INFO - Retrying in 10 seconds...
+2025-06-20 11:06:29,185 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:06:29,187 - nifty_options - ERROR - Failed to get NIFTY spot price from API
+2025-06-20 11:06:29,189 - nifty_options - ERROR - Error getting NIFTY spot price: Failed to get NIFTY spot price from API
+2025-06-20 11:06:29,191 - nifty_options - ERROR - Error getting market data: Failed to get NIFTY spot price from API
+2025-06-20 11:06:29,192 - nifty_options - WARNING - Failed to fetch market data (attempt 3/5): Failed to get NIFTY spot price from API
+2025-06-20 11:06:29,192 - nifty_options - INFO - Retrying in 15 seconds...
+2025-06-20 11:06:44,264 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:06:44,264 - nifty_options - ERROR - Failed to get NIFTY spot price from API
+2025-06-20 11:06:44,265 - nifty_options - ERROR - Error getting NIFTY spot price: Failed to get NIFTY spot price from API
+2025-06-20 11:06:44,266 - nifty_options - ERROR - Error getting market data: Failed to get NIFTY spot price from API
+2025-06-20 11:06:44,268 - nifty_options - WARNING - Failed to fetch market data (attempt 4/5): Failed to get NIFTY spot price from API
+2025-06-20 11:06:44,269 - nifty_options - INFO - Retrying in 20 seconds...
+2025-06-20 11:07:04,320 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:07:04,321 - nifty_options - ERROR - Failed to get NIFTY spot price from API
+2025-06-20 11:07:04,321 - nifty_options - ERROR - Error getting NIFTY spot price: Failed to get NIFTY spot price from API
+2025-06-20 11:07:04,321 - nifty_options - ERROR - Error getting market data: Failed to get NIFTY spot price from API
+2025-06-20 11:07:04,321 - nifty_options - WARNING - Failed to fetch market data (attempt 5/5): Failed to get NIFTY spot price from API
+2025-06-20 11:07:04,321 - nifty_options - ERROR - Max retries reached for market data fetch
+2025-06-20 11:07:04,321 - nifty_options - CRITICAL - Failed to get initial market data: Failed to get NIFTY spot price from API
+2025-06-20 11:07:04,323 - nifty_options - ERROR - Error in strategy: Failed to get NIFTY spot price from API
+Traceback (most recent call last):
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\strategy.py", line 114, in start
+    self._fetch_market_data(max_retries=5)  # More retries for initial fetch
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\strategy.py", line 196, in _fetch_market_data
+    self.df, self.spot_price = self.data_handler.get_market_data()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\data_handler.py", line 594, in get_market_data
+    spot_price = self.get_nifty_spot()
+                 ^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\utils\rate_limit.py", line 56, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\data_handler.py", line 216, in get_nifty_spot
+    raise ValueError("Failed to get NIFTY spot price from API")
+ValueError: Failed to get NIFTY spot price from API
+2025-06-20 11:07:04,325 - nifty_options - INFO - Strategy stopping...
+2025-06-20 11:07:04,326 - nifty_options - INFO - Strategy state saved to data\strategy_state.json
+2025-06-20 11:07:04,328 - root - ERROR - Error: Failed to get NIFTY spot price from API
+Traceback (most recent call last):
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\run.py", line 162, in main
+    strategy.start()  # Start the trading strategy execution
+    ^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\strategy.py", line 114, in start
+    self._fetch_market_data(max_retries=5)  # More retries for initial fetch
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\strategy.py", line 196, in _fetch_market_data
+    self.df, self.spot_price = self.data_handler.get_market_data()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\data_handler.py", line 594, in get_market_data
+    spot_price = self.get_nifty_spot()
+                 ^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\utils\rate_limit.py", line 56, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\data_handler.py", line 216, in get_nifty_spot
+    raise ValueError("Failed to get NIFTY spot price from API")
+ValueError: Failed to get NIFTY spot price from API
+2025-06-20 11:08:10,193 - nifty_options - INFO - Running in live mode
+2025-06-20 11:08:10,194 - nifty_options - INFO - DhanHQ API client initialized successfully
+2025-06-20 11:08:10,194 - nifty_options - INFO - Strategy started at 2025-06-20 11:08:10.194769
+2025-06-20 11:08:10,197 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.dhan.co:443
+2025-06-20 11:08:10,737 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:08:10,836 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:08:10,839 - nifty_options - ERROR - Failed to get NIFTY spot price from API
+2025-06-20 11:08:10,840 - nifty_options - ERROR - Error getting NIFTY spot price: Failed to get NIFTY spot price from API
+2025-06-20 11:08:10,841 - nifty_options - ERROR - Error getting market data: Failed to get NIFTY spot price from API
+2025-06-20 11:08:10,842 - nifty_options - WARNING - Failed to fetch market data (attempt 1/5): Failed to get NIFTY spot price from API
+2025-06-20 11:08:10,843 - nifty_options - INFO - Retrying in 5 seconds...
+2025-06-20 11:08:15,887 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:08:15,891 - nifty_options - ERROR - Failed to get NIFTY spot price from API
+2025-06-20 11:08:15,893 - nifty_options - ERROR - Error getting NIFTY spot price: Failed to get NIFTY spot price from API
+2025-06-20 11:08:15,894 - nifty_options - ERROR - Error getting market data: Failed to get NIFTY spot price from API
+2025-06-20 11:08:15,896 - nifty_options - WARNING - Failed to fetch market data (attempt 2/5): Failed to get NIFTY spot price from API
+2025-06-20 11:08:15,896 - nifty_options - INFO - Retrying in 10 seconds...
+2025-06-20 11:08:25,997 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:08:26,008 - nifty_options - ERROR - Failed to get NIFTY spot price from API
+2025-06-20 11:08:26,009 - nifty_options - ERROR - Error getting NIFTY spot price: Failed to get NIFTY spot price from API
+2025-06-20 11:08:26,010 - nifty_options - ERROR - Error getting market data: Failed to get NIFTY spot price from API
+2025-06-20 11:08:26,012 - nifty_options - WARNING - Failed to fetch market data (attempt 3/5): Failed to get NIFTY spot price from API
+2025-06-20 11:08:26,013 - nifty_options - INFO - Retrying in 15 seconds...
+2025-06-20 11:08:41,061 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:08:41,064 - nifty_options - ERROR - Failed to get NIFTY spot price from API
+2025-06-20 11:08:41,065 - nifty_options - ERROR - Error getting NIFTY spot price: Failed to get NIFTY spot price from API
+2025-06-20 11:08:41,066 - nifty_options - ERROR - Error getting market data: Failed to get NIFTY spot price from API
+2025-06-20 11:08:41,066 - nifty_options - WARNING - Failed to fetch market data (attempt 4/5): Failed to get NIFTY spot price from API
+2025-06-20 11:08:41,067 - nifty_options - INFO - Retrying in 20 seconds...
+2025-06-20 11:09:01,118 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:09:01,121 - nifty_options - ERROR - Failed to get NIFTY spot price from API
+2025-06-20 11:09:01,121 - nifty_options - ERROR - Error getting NIFTY spot price: Failed to get NIFTY spot price from API
+2025-06-20 11:09:01,122 - nifty_options - ERROR - Error getting market data: Failed to get NIFTY spot price from API
+2025-06-20 11:09:01,123 - nifty_options - WARNING - Failed to fetch market data (attempt 5/5): Failed to get NIFTY spot price from API
+2025-06-20 11:09:01,123 - nifty_options - ERROR - Max retries reached for market data fetch
+2025-06-20 11:09:01,124 - nifty_options - CRITICAL - Failed to get initial market data: Failed to get NIFTY spot price from API
+2025-06-20 11:09:01,124 - nifty_options - ERROR - Error in strategy: Failed to get NIFTY spot price from API
+Traceback (most recent call last):
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\strategy.py", line 114, in start
+    self._fetch_market_data(max_retries=5)  # More retries for initial fetch
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\strategy.py", line 196, in _fetch_market_data
+    self.df, self.spot_price = self.data_handler.get_market_data()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\data_handler.py", line 595, in get_market_data
+    spot_price = self.get_nifty_spot()
+                 ^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\utils\rate_limit.py", line 56, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\data_handler.py", line 217, in get_nifty_spot
+    raise ValueError("Failed to get NIFTY spot price from API")
+ValueError: Failed to get NIFTY spot price from API
+2025-06-20 11:09:01,127 - nifty_options - INFO - Strategy stopping...
+2025-06-20 11:09:01,130 - nifty_options - INFO - Strategy state saved to data\strategy_state.json
+2025-06-20 11:09:01,130 - root - ERROR - Error: Failed to get NIFTY spot price from API
+Traceback (most recent call last):
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\run.py", line 162, in main
+    strategy.start()  # Start the trading strategy execution
+    ^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\strategy.py", line 114, in start
+    self._fetch_market_data(max_retries=5)  # More retries for initial fetch
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\strategy.py", line 196, in _fetch_market_data
+    self.df, self.spot_price = self.data_handler.get_market_data()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\data_handler.py", line 595, in get_market_data
+    spot_price = self.get_nifty_spot()
+                 ^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\utils\rate_limit.py", line 56, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\adars\Algo-Trading\Nifty-Options-Algo\core\data_handler.py", line 217, in get_nifty_spot
+    raise ValueError("Failed to get NIFTY spot price from API")
+ValueError: Failed to get NIFTY spot price from API
+2025-06-20 11:10:59,459 - nifty_options - INFO - Running in live mode
+2025-06-20 11:10:59,459 - nifty_options - INFO - DhanHQ API client initialized successfully
+2025-06-20 11:10:59,460 - nifty_options - INFO - Strategy started at 2025-06-20 11:10:59.460482
+2025-06-20 11:10:59,462 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.dhan.co:443
+2025-06-20 11:11:00,025 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:11:00,110 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:11:00,146 - nifty_options - INFO - Successfully fetched initial market data
+2025-06-20 11:11:00,282 - nifty_options - ERROR - Error in strategy iteration: SignalGenerator.generate_signals() missing 1 required positional argument: 'spot_price'
+2025-06-20 11:11:00,284 - nifty_options - ERROR - Error in strategy iteration: SignalGenerator.generate_signals() missing 1 required positional argument: 'spot_price'
+2025-06-20 11:12:30,288 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:12:30,792 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:12:30,877 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:12:30,891 - nifty_options - ERROR - Error in strategy iteration: SignalGenerator.generate_signals() missing 1 required positional argument: 'spot_price'
+2025-06-20 11:12:30,892 - nifty_options - ERROR - Error in strategy iteration: SignalGenerator.generate_signals() missing 1 required positional argument: 'spot_price'
+2025-06-20 11:14:00,896 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:14:01,486 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:14:01,561 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:14:01,568 - nifty_options - ERROR - Error in strategy iteration: SignalGenerator.generate_signals() missing 1 required positional argument: 'spot_price'
+2025-06-20 11:14:01,568 - nifty_options - ERROR - Error in strategy iteration: SignalGenerator.generate_signals() missing 1 required positional argument: 'spot_price'
+2025-06-20 11:14:13,698 - nifty_options - INFO - Running in live mode
+2025-06-20 11:14:13,700 - nifty_options - INFO - DhanHQ API client initialized successfully
+2025-06-20 11:14:13,700 - nifty_options - INFO - Strategy started at 2025-06-20 11:14:13.700468
+2025-06-20 11:14:13,703 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.dhan.co:443
+2025-06-20 11:14:14,279 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:14:14,342 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:14:14,343 - nifty_options - INFO - Successfully fetched initial market data
+2025-06-20 11:14:46,620 - nifty_options - INFO - Running in live mode
+2025-06-20 11:14:46,620 - nifty_options - INFO - DhanHQ API client initialized successfully
+2025-06-20 11:14:46,621 - nifty_options - INFO - Strategy started at 2025-06-20 11:14:46.621848
+2025-06-20 11:14:46,624 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.dhan.co:443
+2025-06-20 11:14:47,293 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:14:47,348 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:14:47,370 - nifty_options - INFO - Successfully fetched initial market data
+2025-06-20 11:15:34,202 - nifty_options - INFO - Running in live mode
+2025-06-20 11:15:34,202 - nifty_options - INFO - DhanHQ API client initialized successfully
+2025-06-20 11:15:34,204 - nifty_options - INFO - Strategy started at 2025-06-20 11:15:34.204026
+2025-06-20 11:15:34,206 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.dhan.co:443
+2025-06-20 11:15:34,796 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:15:34,857 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:15:34,884 - nifty_options - INFO - Successfully fetched initial market data
+2025-06-20 11:16:35,031 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:16:36,528 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:16:36,642 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:17:36,691 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:17:37,241 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:17:37,346 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
