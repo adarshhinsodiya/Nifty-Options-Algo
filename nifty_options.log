@@ -360,3 +360,6 @@ ValueError: Failed to get NIFTY spot price from API
 2025-06-20 12:13:42,790 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
 2025-06-20 12:13:43,353 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
 2025-06-20 12:13:43,466 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:14:43,483 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 12:14:44,019 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:14:44,130 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
