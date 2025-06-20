@@ -166,7 +166,9 @@ class NiftyOptionsStrategy:
 
             # Generate and execute signals
             signals = self.signal_generator.generate_signals(self.df, self.spot_price)
-            self.execution_handler.execute_signals(signals)
+            if signals:  # Check if signals were generated
+                for signal in signals:  # Process each signal individually
+                    self.execution_handler.execute_signal(signal)
             
         except Exception as e:
             self.logger.error(f"Error in strategy iteration: {e}")

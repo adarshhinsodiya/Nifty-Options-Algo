@@ -36,12 +36,12 @@ class RateLimiter:
         self.last_call_time[key] = time.time()
 
 
-def rate_limited(limiter: RateLimiter, key: str = "default"):
+def rate_limited(limiter=None, key="default"):
     """
     Decorator for rate-limited functions
     
     Args:
-        limiter: RateLimiter instance
+        limiter: Either a RateLimiter instance or a lambda function that returns one
         key: Identifier for the rate limit
         
     Returns:
@@ -50,7 +50,9 @@ def rate_limited(limiter: RateLimiter, key: str = "default"):
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs) -> Any:
-            limiter.limit(key)
+            # Get the actual rate limiter instance
+            actual_limiter = limiter(args[0]) if callable(limiter) else limiter
+            actual_limiter.limit(key)
             return func(*args, **kwargs)
         return wrapper
     return decorator

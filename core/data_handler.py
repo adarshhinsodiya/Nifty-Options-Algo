@@ -60,6 +60,16 @@ class DataHandler:
         self.dhan_api = dhan_api
         self.logger = logger or logging.getLogger(__name__)
         
+        # Initialize rate limiter with proper config
+        throttle_ms = int(config.get('api', 'throttle_ms', fallback='200'))
+        self.rate_limiter = RateLimiter(throttle_ms=throttle_ms)
+        
+        # Initialize cache
+        self.cache = {}  # Stores the actual data
+        self.cache_timestamps = {}  # Stores the timestamp of when each key was cached
+        self.cache_ttl = int(config.get('data', 'cache_ttl_seconds', fallback='60'))
+        self.max_cache_size = int(config.get('data', 'max_cache_size', fallback='1000'))
+        
         # Load environment variables from dhan_credentials.env
         load_dotenv('.env')
         
@@ -71,16 +81,6 @@ class DataHandler:
                 self.dhan_api = dhanhq(client_id, access_token)
             else:
                 self.logger.warning("Dhan API credentials missing in env file")
-        
-        # Initialize cache
-        self.cache = {}  # Stores the actual data
-        self.cache_timestamps = {}  # Stores the timestamp of when each key was cached
-        self.cache_ttl = int(config.get('data', 'cache_ttl_seconds', fallback='60'))
-        self.max_cache_size = int(config.get('data', 'max_cache_size', fallback='1000'))
-        
-        # Initialize rate limiter
-        throttle_ms = int(config.get('data', 'throttle_ms', fallback='200'))
-        self.rate_limiter = RateLimiter(throttle_ms=throttle_ms)
         
     
     def _clean_cache(self) -> None:
@@ -164,7 +164,7 @@ class DataHandler:
         return True
         # If all the above checks pass, returns True indicating a valid response.
 
-    @rate_limited(limiter=None, key="get_nifty_spot")
+    @rate_limited(limiter=lambda self: self.rate_limiter, key="get_nifty_spot")
     def get_nifty_spot(self) -> float:
         """
         Get the current NIFTY spot price
@@ -181,17 +181,13 @@ class DataHandler:
             Current NIFTY spot price
         """
         
-        # Use the instance rate limiter if none provided in decorator
-        if not hasattr(self.get_nifty_spot, "_rate_limiter"):
-            self.get_nifty_spot._rate_limiter = self.rate_limiter
-        
         cache_key = "nifty_spot"
         self._clean_cache()
         
         # Return cached value if available
         if cache_key in self.cache:
             return self.cache[cache_key]
-        
+            
         try:
             if self.dhan_api and DHANHQ_AVAILABLE:
                 # Get NIFTY spot price from Dhan API
@@ -235,9 +231,9 @@ class DataHandler:
             self.logger.error(f"Error getting NIFTY spot price: {e}")
             # Return a default value in case of error
             return 18500.0
-
-    @rate_limited(limiter=None, key="get_recent_nifty_data")
-    def get_recent_nifty_data(self, interval_minutes: int = 1, days: int = 1) -> pd.DataFrame:  
+            
+    @rate_limited(limiter=lambda self: self.rate_limiter, key="get_recent_nifty_data")
+    def get_recent_nifty_data(self, interval_minutes: int = 1, days: int = 1) -> pd.DataFrame:
         """
         Get recent NIFTY price data
         
@@ -256,10 +252,6 @@ class DataHandler:
         Returns:
             DataFrame with NIFTY price data
         """
-        # Use the instance rate limiter if none provided in decorator
-        if not hasattr(self.get_recent_nifty_data, "_rate_limiter"):
-            self.get_recent_nifty_data._rate_limiter = self.rate_limiter
-        
         # Generate a unique cache key based on the interval and days
         cache_key = f"nifty_data_{interval_minutes}_{days}"
         
@@ -269,7 +261,7 @@ class DataHandler:
         # Check if data is present in cache and return it if available
         if cache_key in self.cache:
             return self.cache[cache_key]
-        
+            
         try:
             # Check if DhanHQ API is available and instantiated
             if self.dhan_api and DHANHQ_AVAILABLE:
@@ -283,11 +275,11 @@ class DataHandler:
                 
                 # Fetch historical data from DhanHQ API
                 response = self.dhan_api.intraday_minute_data(
-                    security_id="13", 
-                    exchange_segment="IDX_I", 
+                    security_id="13",
+                    exchange_segment="IDX_I",
                     instrument_type="INDEX", 
-                    from_date="2025-06-19", 
-                    to_date="2025-06-19"
+                    from_date=start_str, 
+                    to_date=end_str
                 )
                 
                 # Check if response contains data
@@ -300,17 +292,18 @@ class DataHandler:
                     df = df.sort_values('timestamp')
                     
                     # Rename columns to match standard OHLCV format
+                    # Ensure we use lowercase column names as expected by signal generator
                     df = df.rename(columns={
-                        'open': 'Open',
-                        'high': 'High',
-                        'low': 'Low',
-                        'close': 'Close',
-                        'volume': 'Volume',
-                        'timestamp': 'Date'
+                        'open': 'open',
+                        'high': 'high',
+                        'low': 'low',
+                        'close': 'close',
+                        'volume': 'volume',
+                        'timestamp': 'date'
                     })
                     
-                    # Set 'Date' as the DataFrame index
-                    df = df.set_index('Date')
+                    # Set 'date' as the DataFrame index
+                    df = df.set_index('date')
                     
                     # Cache the DataFrame result
                     self.cache[cache_key] = df
@@ -363,12 +356,12 @@ class DataHandler:
                 
                 # Append the simulated data to the list
                 data.append({
-                    'Date': dt,
-                    'Open': max(open_price, low),
-                    'High': max(high, open_price, close),
-                    'Low': min(low, open_price, close),
-                    'Close': close,
-                    'Volume': max(0, volume)
+                    'date': dt,
+                    'open': max(open_price, low),
+                    'high': max(high, open_price, close),
+                    'low': min(low, open_price, close),
+                    'close': close,
+                    'volume': max(0, volume)
                 })
                 
                 # Update previous close with current close for next iteration
@@ -376,7 +369,7 @@ class DataHandler:
             
             # Convert the list of simulated data to a DataFrame
             df = pd.DataFrame(data)
-            df = df.set_index('Date')
+            df = df.set_index('date')
             
             # Cache the simulated DataFrame result
             self.cache[cache_key] = df
@@ -389,8 +382,8 @@ class DataHandler:
             self.logger.error(f"Error getting NIFTY historical data: {e}")
             # Return an empty DataFrame in case of an error
             return pd.DataFrame()
-    
-    @rate_limited(limiter=None, key="get_option_chain")
+            
+    @rate_limited(limiter=lambda self: self.rate_limiter, key="get_option_chain")
     def get_option_chain(self, expiry_date: date) -> Optional[pd.DataFrame]:
         """
         Get NIFTY option chain data
@@ -416,69 +409,62 @@ class DataHandler:
                 if client_id and access_token:
                     self.dhan_api = dhanhq(client_id, access_token)
 
-            # Step 2: If the Dhan API is available, call the option chain method
-            if self.dhan_api:
-                self.rate_limit_check()
-                
-                expiry_str = expiry_date.strftime("%Y-%m-%d")
-                cache_key = f"option_chain_{expiry_str}"
-                self._clean_cache()
-                
+            expiry_str = expiry_date.strftime("%Y-%m-%d")
+            cache_key = f"option_chain_{expiry_str}"
+            self._clean_cache()
+            
                 # Return cached value if available
-                if cache_key in self.cache:
-                    return self.cache[cache_key]
+            if cache_key in self.cache:
+                return self.cache[cache_key]
                 
                 # Call the option chain method
-                chain_response = self.dhan_api.option_chain(
-                    under_security_id=13,  # NIFTY ID
-                    under_exchange_segment=ExchangeSegment.INDEX.value,
-                    expiry=expiry_str
-                )
+            chain_response = self.dhan_api.option_chain(
+                under_security_id=13,  # NIFTY ID
+                under_exchange_segment=ExchangeSegment.INDEX.value,
+                expiry=expiry_str
+            )
 
                 # Step 3: If the API call is successful, parse the response
-                if self._validate_api_response(chain_response):
-                    data = chain_response.get('data', {}).get('data', {}).get('oc', {})
-                    if not data:
-                        self.logger.error("No option chain data in response")
-                        return None
-                    
-                    # Flatten data into DataFrame
-                    rows = []
-                    for strike, strike_data in data.items():
-                        strike_float = f"{float(strike):.6f}"
-                        for option_type, option_data in strike_data.items():
-                            rows.append({
-                                'strike': strike_float,
-                                'type': option_type.strip().lower(),
-                                'last_price': option_data.get('last_price', 0),
-                                'volume': option_data.get('total_traded_volume', 0),
-                                'oi': option_data.get('open_interest', 0),
-                                'bid_price': option_data.get('bid_price', 0),
-                                'ask_price': option_data.get('ask_price', 0),
-                                'implied_volatility': option_data.get('implied_volatility', 0)
-                            })
-                    
-                    if not rows:
-                        self.logger.error("No option data found after parsing")
-                        return None
-                    
-                    # Create and process DataFrame
-                    df = pd.DataFrame(rows)
-                    numeric_cols = ['last_price', 'volume', 'oi', 'bid_price', 'ask_price', 'implied_volatility']
-                    for col in numeric_cols:
-                        df[col] = pd.to_numeric(df[col], errors='coerce')
-                    df.fillna(0, inplace=True)
-                    
-                    # Cache the DataFrame result
-                    self.cache[cache_key] = df
-                    self.cache_timestamps[cache_key] = time_lib.time()
-                    
-                    return df
-                else:
-                    self.logger.error("Invalid API response for option chain")
+            if self._validate_api_response(chain_response):
+                data = chain_response.get('data', {}).get('data', {}).get('oc', {})
+                if not data:
+                    self.logger.error("No option chain data in response")
                     return None
+                
+                    # Flatten data into DataFrame
+                rows = []
+                for strike, strike_data in data.items():
+                    strike_float = f"{float(strike):.6f}"
+                    for option_type, option_data in strike_data.items():
+                        rows.append({
+                            'strike': strike_float,
+                            'type': option_type.strip().lower(),
+                            'last_price': option_data.get('last_price', 0),
+                            'volume': option_data.get('total_traded_volume', 0),
+                            'oi': option_data.get('open_interest', 0),
+                            'bid_price': option_data.get('bid_price', 0),
+                            'ask_price': option_data.get('ask_price', 0),
+                            'implied_volatility': option_data.get('implied_volatility', 0)
+                        })
+                
+                if not rows:
+                    self.logger.error("No option data found after parsing")
+                    return None
+                
+                    # Create and process DataFrame
+                df = pd.DataFrame(rows)
+                numeric_cols = ['last_price', 'volume', 'oi', 'bid_price', 'ask_price', 'implied_volatility']
+                for col in numeric_cols:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                df.fillna(0, inplace=True)
+                
+                    # Cache the DataFrame result
+                self.cache[cache_key] = df
+                self.cache_timestamps[cache_key] = time_lib.time()
+                
+                return df
             else:
-                self.logger.error("Dhan API not available")
+                self.logger.error("Invalid API response for option chain")
                 return None
 
         except Exception as e:
