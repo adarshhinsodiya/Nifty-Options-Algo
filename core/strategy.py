@@ -103,27 +103,37 @@ class NiftyOptionsStrategy:
     
     def start(self) -> None:
         """
-        Start the strategy
+        Start the strategy execution
         """
         self.running = True
-        self.start_time = datetime.now()
-        self.logger.info(f"Strategy started at {self.start_time}")
+        self.logger.info(f"Strategy started at {datetime.now()}")
         
         try:
-            interval_seconds = int(self.config.get('config', 'check_interval_seconds', fallback='60'))
+            # Initial market data fetch - critical for strategy operation
+            try:
+                self._fetch_market_data(max_retries=5)  # More retries for initial fetch
+                self.logger.info("Successfully fetched initial market data")
+            except Exception as e:
+                self.logger.critical(f"Failed to get initial market data: {e}")
+                raise
+                
+            # Main strategy loop
+            interval_seconds = int(self.config.get('config', 'iteration_interval_seconds', fallback='60'))
             
             while self.running:
-                self.iteration_count += 1
-                
-                # Check if market is open
                 if not self._is_market_open():
                     self.logger.info("Market is closed, waiting...")
                     time.sleep(60)  # Check every minute
                     continue
                 
-                # Run one iteration of the strategy
-                self._run_iteration()
-                
+                try:
+                    self._run_iteration()
+                except Exception as e:
+                    self.logger.error(f"Error in strategy iteration: {e}")
+                    if not self.running:  # Don't sleep if we're shutting down
+                        raise
+                    time.sleep(30)  # Wait before retrying
+                    
                 time.sleep(interval_seconds)
                 
         except Exception as e:
@@ -158,32 +168,49 @@ class NiftyOptionsStrategy:
         Run one iteration of the strategy
         """
         try:
-            # Fetch data if needed
-            fetch_interval = int(self.config.get('config', 'data_fetch_interval_seconds', fallback='60'))
-            if (datetime.now() - self.last_data_fetch_time).total_seconds() >= fetch_interval:
-                self._fetch_market_data()
-                self.last_data_fetch_time = datetime.now()
-
-            # Generate and execute signals
-            signals = self.signal_generator.generate_signals(self.df, self.spot_price)
-            if signals:  # Check if signals were generated
-                for signal in signals:  # Process each signal individually
+            # Fetch market data with retry logic
+            self._fetch_market_data()
+            
+            # Generate signals only if we have valid market data
+            signals = self.signal_generator.generate_signals(self.df)
+            
+            if signals:
+                self.logger.info(f"Generated {len(signals)} signals")
+                for signal in signals:
                     self.execution_handler.execute_signal(signal)
             
         except Exception as e:
             self.logger.error(f"Error in strategy iteration: {e}")
             raise
     
-    def _fetch_market_data(self) -> None:
+    def _fetch_market_data(self, max_retries: int = 3) -> None:
         """
-        Fetch market data from data handler
+        Fetch market data (OHLC and spot price) from data handler
+        
+        Args:
+            max_retries: Maximum number of retry attempts for API failures
         """
-        try:
-            self.df, self.spot_price = self.data_handler.get_market_data()
-            self.logger.info(f"Fetched market data with {len(self.df)} records")
-        except Exception as e:
-            self.logger.error(f"Error fetching market data: {e}")
-            raise
+        retry_count = 0
+        while retry_count < max_retries:
+            try:
+                self.df, self.spot_price = self.data_handler.get_market_data()
+                if self.df.empty:
+                    raise ValueError("Received empty market data")
+                return
+                
+            except Exception as e:
+                retry_count += 1
+                wait_time = min(60, 5 * retry_count)  # Exponential backoff with max 60s
+                self.logger.warning(
+                    f"Failed to fetch market data (attempt {retry_count}/{max_retries}): {e}"
+                )
+                
+                if retry_count < max_retries:
+                    self.logger.info(f"Retrying in {wait_time} seconds...")
+                    time.sleep(wait_time)
+                else:
+                    self.logger.error("Max retries reached for market data fetch")
+                    raise
     
     def _is_market_open(self) -> bool:
         """

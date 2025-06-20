@@ -36,9 +36,9 @@ def setup_argparse() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mode",
         type=str,
-        choices=["simulation", "live"],  # Limit choices to simulation or live
+        choices=["live"],  # Limit choices to live
         default="live",  # Default to live mode
-        help="Run mode (simulation or live)"
+        help="Run mode (live)"
     )
     
     # Add a flag to enable backtest mode

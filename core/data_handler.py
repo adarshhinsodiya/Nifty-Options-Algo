@@ -21,7 +21,7 @@ try:
     DHANHQ_AVAILABLE = True
 except ImportError:
     DHANHQ_AVAILABLE = False
-    print("Warning: dhanhq library not found. Running in simulation mode.")
+    print("Warning: dhanhq library not found. API functionality will not be available.")
 
 
 class DataHandler:
@@ -158,7 +158,18 @@ class DataHandler:
             
         # Additional validation for data structure
         if 'data' not in response:
-            self.logger.debug("API response missing 'data' key")
+            self.logger.error("API response missing 'data' key")
+            return False
+            
+        # Check if data contains actual market data
+        if not response['data']:
+            self.logger.error("API returned empty data")
+            return False
+            
+        # Check for required OHLC fields in first data point
+        first_item = response['data'][0] if isinstance(response['data'], list) else response['data']
+        if not all(field in first_item for field in ['open', 'high', 'low', 'close']):
+            self.logger.error("API data missing required OHLC fields")
             return False
             
         return True
@@ -169,85 +180,61 @@ class DataHandler:
         """
         Get the current NIFTY spot price
         
-        This function fetches the current NIFTY spot price from the Dhan API if
-        available, or falls back to a simulated price if not.
-
-        The function first checks if the result is already cached. If it is, it
-        returns the cached value. If not, it fetches the price from the Dhan API
-        and caches the result. If the Dhan API is unavailable, it generates a
-        simulated price and caches that instead.
-
-        Returns:
-            Current NIFTY spot price
-        """
+        This function fetches the current NIFTY spot price from the Dhan API.
         
-        cache_key = "nifty_spot"
-        self._clean_cache()
+        Returns:
+            float: The current NIFTY spot price
+        """
+        try:
+            if not self.dhan_api and DHANHQ_AVAILABLE:
+                client_id = os.getenv('DHAN_CLIENT_ID')
+                access_token = os.getenv('DHAN_ACCESS_TOKEN')
+                if client_id and access_token:
+                    self.dhan_api = dhanhq(client_id, access_token)
+            
+            cache_key = "nifty_spot"
+            self._clean_cache()
         
         # Return cached value if available
-        if cache_key in self.cache:
-            return self.cache[cache_key]
+            if cache_key in self.cache:
+                return self.cache[cache_key]
             
-        try:
-            if self.dhan_api and DHANHQ_AVAILABLE:
-                # Get NIFTY spot price from Dhan API
-                response = self.dhan_api.intraday_minute_data(
-                    security_id="13", 
-                    exchange_segment="IDX_I", 
-                    instrument_type="INDEX", 
-                    from_date="2025-06-19", 
-                    to_date="2025-06-19"
-                )
-                
-                if response and 'data' in response:
-                    # Extract the spot price from the response
-                    spot_price = float(response['data']['close'][-1])
-                    
-                    # Cache the result
+            response = self.dhan_api.intraday_minute_data(
+                security_id=13,
+                exchange_segment=ExchangeSegment.INDEX.value,
+                instrument_type='INDEX',
+                from_date="2025-06-20",
+                to_date="2025-06-20"
+            )
+            
+            if self._validate_api_response(response):
+                data = response.get('data', {}).get('data', [])
+                if data and len(data) > 0:
+                    latest = data[-1]
+                    spot_price = latest.get('close', 0)
                     self.cache[cache_key] = spot_price
                     self.cache_timestamps[cache_key] = time_lib.time()
                     
                     # Return the spot price
                     return spot_price
-                else:
-                    # Log an error if the Dhan API returned an unexpected response
-                    self.logger.error(f"Failed to get NIFTY spot price: {response}")
             
-            # Fallback to simulation mode if Dhan API unavailable
-            self.logger.warning("Using simulated NIFTY spot price")
-            
-            # Generate a realistic NIFTY price (around 18000-19000)
-            simulated_price = 18500 + (np.random.random() * 500)
-            
-            # Cache the result
-            self.cache[cache_key] = simulated_price
-            self.cache_timestamps[cache_key] = time_lib.time()
-            
-            # Return the simulated spot price
-            return simulated_price
+            self.logger.error("Failed to get NIFTY spot price from API")
+            raise ValueError("Failed to get NIFTY spot price from API")
             
         except Exception as e:
             # Log an error if an exception was raised
             self.logger.error(f"Error getting NIFTY spot price: {e}")
-            # Return a default value in case of error
-            return 18500.0
-            
+            raise          
     @rate_limited(limiter=lambda self: self.rate_limiter, key="get_recent_nifty_data")
     def get_recent_nifty_data(self, interval_minutes: int = 1, days: int = 1) -> pd.DataFrame:
         """
         Get recent NIFTY price data
         
-        This function fetches recent NIFTY price data from the DhanHQ API if
-        available, or falls back to simulated data if not.
-
-        The function first checks if the result is already cached. If it is, it
-        returns the cached value. If not, it fetches the price data from the
-        DhanHQ API and caches the result. If the DhanHQ API is unavailable, it
-        generates simulated price data and caches that instead.
-
+        This function fetches recent NIFTY price data from the DhanHQ API.
+        
         Args:
-            interval_minutes: Candle interval in minutes
-            days: Number of days of historical data to fetch
+            interval_minutes: Interval between data points in minutes
+            days: Number of days of data to fetch
             
         Returns:
             DataFrame with NIFTY price data
@@ -314,68 +301,9 @@ class DataHandler:
                     # Log an error if the response does not contain expected data
                     self.logger.error(f"Failed to get NIFTY historical data: {response}")
             
-            # If DhanHQ API is not available, simulate data
-            self.logger.warning("Using simulated NIFTY historical data")
-            
-            # Generate simulated date range based on interval and days
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=days)
-            
-            # Create a date range with specified interval
-            date_range = pd.date_range(
-                start=start_date,
-                end=end_date,
-                freq=f"{interval_minutes}min"
-            )
-            
-            # Initialize parameters for simulated price generation
-            base_price = 18500
-            price_volatility = 50
-            
-            # Prepare a list to hold simulated OHLCV data
-            data = []
-            prev_close = base_price
-            
-            # Iterate over each datetime in the date range
-            for dt in date_range:
-                # Skip times outside market hours (9:15 AM to 3:30 PM)
-                if dt.time() < time(9, 15) or dt.time() > time(15, 30):
-                    continue
-                
-                # Skip weekends
-                if dt.weekday() > 4:  # 5 = Saturday, 6 = Sunday
-                    continue
-                
-                # Simulate OHLCV (Open, High, Low, Close, Volume) data
-                change = np.random.normal(0, price_volatility)
-                close = prev_close + change
-                high = close + abs(np.random.normal(0, price_volatility/2))
-                low = close - abs(np.random.normal(0, price_volatility/2))
-                open_price = prev_close + np.random.normal(0, price_volatility/4)
-                volume = int(np.random.normal(1000000, 500000))
-                
-                # Append the simulated data to the list
-                data.append({
-                    'date': dt,
-                    'open': max(open_price, low),
-                    'high': max(high, open_price, close),
-                    'low': min(low, open_price, close),
-                    'close': close,
-                    'volume': max(0, volume)
-                })
-                
-                # Update previous close with current close for next iteration
-                prev_close = close
-            
-            # Convert the list of simulated data to a DataFrame
-            df = pd.DataFrame(data)
-            df = df.set_index('date')
-            
-            # Cache the simulated DataFrame result
-            self.cache[cache_key] = df
-            self.cache_timestamps[cache_key] = time_lib.time()
-            
-            return df
+            # If API call fails, raise an error
+            self.logger.error("Failed to get NIFTY historical data from API")
+            raise ValueError("Failed to get NIFTY historical data from API")
             
         except Exception as e:
             # Log any exception that occurs during data fetching
@@ -424,6 +352,14 @@ class DataHandler:
                 expiry=expiry_str
             )
 
+            # Log raw response for debugging
+            self.logger.debug(f"Raw API response: {chain_response}")
+            
+            # Validate response
+            if not self._validate_api_response(chain_response):
+                self.logger.error("Invalid API response format")
+                return None
+                
                 # Step 3: If the API call is successful, parse the response
             if self._validate_api_response(chain_response):
                 data = chain_response.get('data', {}).get('data', {}).get('oc', {})
@@ -621,42 +557,10 @@ class DataHandler:
             
             return strike_data.to_dict(orient='records')[0]
         else:
-            # If strike not found, generate simulated data
-            self.logger.warning(f"Strike {strike} {option_type} not found in option chain, using simulated data")
-            
-            # Get spot price
-            spot_price = self.get_nifty_spot()
-            
-            # Calculate days to expiry
-            days_to_expiry = max(1, (expiry_date - date.today()).days)
-            time_to_expiry = days_to_expiry / 365.0
-            volatility = 0.2  # 20% annualized volatility
-            
-            # Simplified pricing model
-            if option_type == 'CE':
-                intrinsic = max(0, spot_price - strike)
-            else:  # PE
-                intrinsic = max(0, strike - spot_price)
-            
-            # Time value approximation
-            time_value = spot_price * volatility * np.sqrt(time_to_expiry)
-            price_factor = np.exp(-0.5 * ((strike - spot_price) / (spot_price * volatility))**2)
-            price = intrinsic + (time_value * price_factor)
-            
-            # Create simulated data
-            strike_data = {
-                'strike': strike,
-                'last_price': round(price, 1),
-                'change': round(np.random.normal(0, price * 0.03), 1),
-                'volume': int(1000 * np.random.random()),
-                'oi': int(5000 * np.random.random()),
-                'bid_price': round(price * 0.98, 1),
-                'ask_price': round(price * 1.02, 1),
-                'implied_volatility': round(volatility * (0.8 + 0.4 * np.random.random()), 2),
-                'symbol': self.get_option_symbol(strike, option_type, expiry_date),
-                'type': option_type,
-                'expiryDate': expiry_date.strftime("%Y-%m-%d")
-            }
+            # If strike not found, raise an error
+            error_msg = f"Strike {strike} {option_type} not found in option chain"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
         
         return strike_data
     
@@ -694,6 +598,9 @@ class DataHandler:
             
             # Get current spot price
             spot_price = self.get_nifty_spot()
+            
+            print(df.head())
+            print(spot_price)
             
             return df, spot_price
             
