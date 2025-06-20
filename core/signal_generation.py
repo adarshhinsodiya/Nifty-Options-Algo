@@ -41,6 +41,8 @@ class SignalGenerator:
         self.confidence_threshold = float(config.get('strategy', 'confidence_threshold', fallback='0.7'))
         self.stop_loss_pct = float(config.get('strategy', 'stop_loss_pct', fallback='0.3'))
         self.take_profit_pct = float(config.get('strategy', 'take_profit_pct', fallback='0.6'))
+        self.strike_step = float(config.get('strategy', 'strike_step', fallback='50.0'))
+        self.ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
         
         # Initialize signal history
         self.signal_history = []

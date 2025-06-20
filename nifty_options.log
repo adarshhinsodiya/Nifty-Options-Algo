@@ -262,3 +262,83 @@ ValueError: Failed to get NIFTY spot price from API
 2025-06-20 11:40:31,640 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
 2025-06-20 11:40:32,205 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
 2025-06-20 11:40:32,294 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:41:32,309 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:41:32,876 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:41:32,951 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:42:32,961 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:42:34,158 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:42:34,252 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:43:34,292 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:43:35,501 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:43:35,587 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:44:35,636 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:44:36,813 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:44:36,906 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:45:36,948 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:45:38,139 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:45:38,209 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:46:38,255 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:46:39,478 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:46:39,567 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:47:39,625 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:47:40,845 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:47:40,931 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:48:40,968 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:48:42,218 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:48:42,309 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:49:42,355 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:49:43,831 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:49:43,921 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:50:43,977 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:50:45,301 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:50:45,380 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:51:45,515 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:51:48,906 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:51:49,030 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:52:49,066 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:52:50,260 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:52:50,359 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:53:50,401 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:53:51,573 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:53:51,662 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:54:51,704 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:54:52,999 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:54:53,097 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:55:53,153 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:55:54,472 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:55:54,594 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:56:54,713 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:56:55,948 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:56:56,037 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:57:56,077 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:57:57,456 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:57:57,513 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:58:57,612 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 11:58:58,735 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:58:58,836 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 11:59:58,890 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 12:00:00,118 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:00:00,213 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:01:00,246 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 12:01:01,402 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:01:01,460 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:02:01,493 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 12:02:02,672 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:02:02,752 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:03:02,786 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 12:03:03,876 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:03:03,959 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:04:03,993 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 12:04:05,032 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:04:05,085 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:04:05,113 - nifty_options - ERROR - Error in strategy iteration: 'SignalGenerator' object has no attribute 'strike_step'
+2025-06-20 12:04:05,114 - nifty_options - ERROR - Error in strategy iteration: 'SignalGenerator' object has no attribute 'strike_step'
+2025-06-20 12:05:35,117 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 12:05:35,619 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:05:35,695 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:06:35,705 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 12:06:36,276 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:06:36,331 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:07:36,352 - urllib3.connectionpool - DEBUG - Resetting dropped connection: api.dhan.co
+2025-06-20 12:07:36,935 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
+2025-06-20 12:07:37,019 - urllib3.connectionpool - DEBUG - https://api.dhan.co:443 "POST /v2/charts/intraday HTTP/1.1" 200 None
