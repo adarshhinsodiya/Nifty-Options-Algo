@@ -5,28 +5,37 @@ from enum import Enum
 
 
 class OrderType(Enum):
-    """Order types for better type safety"""
-    MARKET = "MARKET"
-    LIMIT = "LIMIT"
+    """Order types for Breeze Connect API"""
+    MARKET = "market"
+    LIMIT = "limit"
+    STOPLOSS_LIMIT = "stoploss"
+    STOPLOSS_MARKET = "stoploss_market"
 
 
 class TransactionType(Enum):
-    """Transaction types for better type safety"""
-    BUY = "BUY"
-    SELL = "SELL"
+    """Transaction types for Breeze Connect API"""
+    BUY = "buy"
+    SELL = "sell"
 
 
 class ProductType(Enum):
-    """Product types for better type safety"""
-    INTRADAY = "INTRA"
-    DELIVERY = "CNC"
+    """Product types for Breeze Connect API"""
+    INTRADAY = "intraday"
+    DELIVERY = "delivery"
+    MTF = "mtf"  # Margin Trading Financing
+    CNC = "cnc"   # Cash and Carry
+    CO = "co"     # Cover Order
+    BO = "bo"     # Bracket Order
 
 
 class ExchangeSegment(Enum):
-    """Exchange segments for better type safety"""
-    NSE_EQ = "NSE_EQ"
-    NSE_FNO = "NSE_FNO"
-    INDEX = "IDX_I"
+    """Exchange segments for Breeze Connect API"""
+    NSE = "NSE"
+    NFO = "NFO"
+    BSE = "BSE"
+    BFO = "BFO"
+    CDS = "CDS"
+    MCX = "MCX"
 
 
 @dataclass

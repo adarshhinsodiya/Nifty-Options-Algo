@@ -1,6 +1,14 @@
 import os
 import configparser
-from typing import Optional, Dict, Any, List
+import logging
+from typing import Optional, Dict, Any, List, Tuple
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
 class ConfigLoader:
@@ -12,7 +20,7 @@ class ConfigLoader:
     
     def __init__(self, config_file: Optional[str] = None):
         """
-        Initialize the config loader with a config file path
+        Initialize the config loader with a config file path and environment variables
         
         Args:
             config_file: Path to the configuration file (optional)
@@ -24,6 +32,7 @@ class ConfigLoader:
             raise FileNotFoundError(f"Configuration file not found: {self.config_file}")
             
         self.config.read(self.config_file)
+        self._validate_breeze_connect_config()
     
     def get_section(self, section: str) -> Dict[str, Any]:
         """
@@ -112,3 +121,35 @@ class ConfigLoader:
             Boolean value of the option or fallback if not found
         """
         return self.config.getboolean(section, option, fallback=fallback)
+        
+    def _validate_breeze_connect_config(self) -> None:
+        """
+        Validate Breeze Connect API configuration from environment variables.
+        
+        Raises:
+            ValueError: If required Breeze Connect environment variables are missing
+        """
+        if self.config.getboolean('mode', 'live', fallback=False):
+            required_vars = ['ICICI_API_KEY', 'ICICI_API_SECRET', 'ICICI_SESSION_TOKEN']
+            missing_vars = [var for var in required_vars if not os.getenv(var)]
+            
+            if missing_vars:
+                error_msg = f"Missing required environment variables for Breeze Connect: {', '.join(missing_vars)}"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+            logger.info("Breeze Connect API configuration validated successfully")
+    
+    def get_breeze_connect_config(self) -> Dict[str, str]:
+        """
+        Get Breeze Connect API configuration from environment variables.
+        
+        Returns:
+            Dict containing Breeze Connect configuration
+        """
+        return {
+            'api_key': os.getenv('ICICI_API_KEY', ''),
+            'api_secret': os.getenv('ICICI_API_SECRET', ''),
+            'session_token': os.getenv('ICICI_SESSION_TOKEN', ''),
+            'user_id': os.getenv('ICICI_USER_ID', '')  # Optional
+        }

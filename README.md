@@ -8,7 +8,7 @@ A modular, maintainable Python package for algorithmic trading of NIFTY options.
 - **Technical Analysis**: Implements candle pattern recognition and technical indicator analysis for signal generation
 - **Position Management**: Comprehensive position tracking with stop-loss, take-profit, and P&L calculations
 - **Simulation Mode**: Full simulation capability for testing strategies without real market execution
-- **Live Trading**: Integration with DhanHQ API for live market data and order execution
+- **Live Trading**: Integration with ICICI Direct Breeze Connect API for live market data and order execution
 - **Configurable**: Extensive configuration options via INI files
 - **Logging**: Comprehensive logging with rotation support
 
@@ -48,11 +48,65 @@ Nifty-Options-Algo/
    ```
 
 3. Set up environment variables for live trading:
+   Copy the example environment file and update with your credentials:
+   ```bash
+   cp .env.example .env
    ```
-   # Create a .env file in the project root
-   DHAN_CLIENT_ID=your_client_id
-   DHAN_ACCESS_TOKEN=your_access_token
+   Edit the `.env` file and add your ICICI Direct Breeze Connect API credentials:
    ```
+   # Breeze Connect API Credentials
+   ICICI_API_KEY=your_api_key_here
+   ICICI_API_SECRET=your_api_secret_here
+   ICICI_SESSION_TOKEN=your_session_token_here
+   ICICI_USER_ID=your_user_id_here  # Optional
+   ```
+
+   To get your API credentials:
+   1. Log in to your ICICI Direct account
+   2. Go to Developer API section
+   3. Generate API Key and Secret
+   4. Generate a session token using the API key and secret
+
+## Breeze Connect Integration
+
+This project uses ICICI Direct's Breeze Connect API for live trading. The integration includes:
+
+- **Authentication**: Secure API key and session token management
+- **Rate Limiting**: Built-in rate limiting to respect API quotas
+- **Error Handling**: Comprehensive error handling and retry mechanisms
+- **WebSocket Support**: Optional WebSocket connection for real-time data
+
+### API Rate Limits
+
+Breeze Connect has the following rate limits:
+- 200 requests per minute for REST API
+- 1 request per second for WebSocket API
+
+The application automatically enforces these limits to prevent rate limiting errors.
+
+### Session Management
+
+The Breeze Connect session token is valid for 24 hours. You'll need to generate a new token daily or implement token refresh logic.
+
+### Testing with Breeze Connect
+
+1. **Sandbox Environment**:
+   - Use the Breeze Connect sandbox for testing
+   - Update the base URL in the configuration to point to the sandbox environment
+   - Test with small order quantities first
+
+2. **Live Trading**:
+   - Start with paper trading to validate your strategy
+   - Monitor the logs for any API errors or issues
+   - Gradually increase position sizes as you gain confidence
+
+### Troubleshooting
+
+- **Authentication Errors**: Verify your API key, secret, and session token
+- **Rate Limit Errors**: The application should handle these automatically, but check logs if they persist
+- **Connection Issues**: Verify your internet connection and API endpoint URLs
+- **Session Timeout**: Implement token refresh logic if needed
+
 
 ## Usage
 

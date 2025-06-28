@@ -115,19 +115,24 @@ class SignalGenerator:
         try:
             current = df.iloc[index]
             prev = df.iloc[index - 1]
+            
+            # Debug log candle data
+            self.logger.debug(f"Current candle: O:{current['open']} H:{current['high']} L:{current['low']} C:{current['close']}")
+            self.logger.debug(f"Previous candle: O:{prev['open']} H:{prev['high']} L:{prev['low']} C:{prev['close']}")
+            
         except IndexError:
             self.logger.error("Invalid index for current or previous candle")
             return None, None
 
         for candle in [current, prev]:
             if any(pd.isna(x) for x in [candle['open'], candle['close'], candle['high'], candle['low']]):
-                self.logger.error("Missing candle data")
+                self.logger.warning("Missing candle data - skipping")
                 return None, None
-
+                
         prev_body = abs(prev['close'] - prev['open'])
         prev_range = prev['high'] - prev['low']
         if prev_range == 0:
-            self.logger.error("Prev candle range is zero")
+            self.logger.warning("Prev candle range is zero - skipping")
             return None, None
 
         if prev['close'] < prev['open']:
@@ -137,6 +142,9 @@ class SignalGenerator:
             prev_top_wick = prev['high'] - prev['close']
             prev_bottom_wick = prev['open'] - prev['low']
             
+        # Debug log wick calculations
+        self.logger.debug(f"Prev body: {prev_body}, range: {prev_range}, top_wick: {prev_top_wick}, bottom_wick: {prev_bottom_wick}")
+        
         signal_type = None
         entry_price = current['open']
         

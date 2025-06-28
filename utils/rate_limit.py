@@ -10,7 +10,7 @@ class RateLimiter:
     
     def __init__(self, throttle_ms: int = 200):
         """
-        Initialize the rate limiter
+        Initialize the rate limiter    
         
         Args:
             throttle_ms: Minimum time between API calls in milliseconds

@@ -6,17 +6,20 @@ import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Tuple, Union
 from dotenv import load_dotenv
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # Import position dataclasses and enums
 from core.position import Position, TradeSignal, OrderType, TransactionType, ProductType, ExchangeSegment
 
-# Check if dhanhq is available
+# Check if breeze_connect is available
 try:
-    from dhanhq import dhanhq
-    DHANHQ_AVAILABLE = True
+    from breeze_connect import BreezeConnect
+    BREEZE_CONNECT_AVAILABLE = True
 except ImportError:
-    DHANHQ_AVAILABLE = False
-    print("Warning: dhanhq library not found. Running in simulation mode.")
+    BREEZE_CONNECT_AVAILABLE = False
+    print("Warning: breeze_connect library not found. Running in simulation mode.")
 
 
 class ExecutionHandler:
@@ -24,9 +27,15 @@ class ExecutionHandler:
     Handles trade execution, position management, and P&L calculations
     """
     
-    def __init__(self, config: Dict[str, Any], data_handler=None, dhan_api=None, logger=None):
+    def __init__(self, config: Dict[str, Any], data_handler=None, breeze_api=None, logger=None):
         """
-        Initialize execution handler
+        Initialize execution handler with Breeze Connect API
+        
+        Args:
+            config: Configuration dictionary
+            data_handler: Instance of DataHandler for market data
+            breeze_api: Optional pre-initialized BreezeConnect instance
+            logger: Optional logger instance
         """
         self.config = config
         self.data_handler = data_handler
@@ -35,24 +44,48 @@ class ExecutionHandler:
         # Load environment variables
         load_dotenv()
         
-        # Initialize Dhan API if not provided
-        if dhan_api is None and DHANHQ_AVAILABLE:
-            client_id = os.getenv('DHAN_CLIENT_ID')
-            access_token = os.getenv('DHAN_ACCESS_TOKEN')
-            if client_id and access_token:
-                self.logger.debug(f"Initializing DhanHQ API with client ID: {client_id[:4]}...")
+        # Initialize Breeze Connect API if not provided
+        if breeze_api is None and BREEZE_CONNECT_AVAILABLE:
+            api_key = os.getenv('ICICI_API_KEY')
+            api_secret = os.getenv('ICICI_API_SECRET')
+            session_token = os.getenv('ICICI_SESSION_TOKEN')
+            user_id = os.getenv('ICICI_USER_ID')
+            
+            if all([api_key, api_secret, session_token]):
+                self.logger.debug("Initializing Breeze Connect API...")
                 try:
-                    dhan_api = dhanhq(client_id, access_token)
-                    self.logger.debug("DhanHQ API initialized successfully")
+                    # Configure session with retry and keep-alive
+                    session = requests.Session()
+                    retry_strategy = Retry(
+                        total=3,
+                        backoff_factor=1,
+                        status_forcelist=[500, 502, 503, 504]
+                    )
+                    adapter = HTTPAdapter(max_retries=retry_strategy)
+                    session.mount("https://", adapter)
+                    session.headers.update({'Connection': 'keep-alive'})
+                    
+                    # Initialize BreezeConnect with custom session
+                    breeze_api = BreezeConnect(api_key=api_key)
+                    breeze_api.generate_session(api_secret=api_secret, session_token=session_token)
+                    
+                    # Set user ID if provided
+                    if user_id:
+                        breeze_api.user_id = user_id
+                    
+                    # Set timeout
+                    breeze_api._session.timeout = 30  # 30 second timeout
+                    
+                    self.logger.info("Breeze Connect API initialized successfully")
                 except Exception as e:
-                    self.logger.error(f"Failed to initialize Dhan API: {str(e)}")
+                    self.logger.error(f"Failed to initialize Breeze Connect API: {str(e)}")
+                    if "session" in locals():
+                        session.close()
                     raise
             else:
-                self.logger.error("Dhan API credentials missing in env file")
-        else:
-            dhan_api = dhan_api
+                self.logger.error("Breeze Connect API credentials missing in env file")
         
-        self.dhan_api = dhan_api
+        self.breeze_api = breeze_api
         
         # Load execution parameters from config
         self.mode = config.get('mode', 'simulation').lower()
@@ -126,35 +159,51 @@ class ExecutionHandler:
         
         # Execute the trade
         order_id = None
-        if self.mode == 'live' and self.dhan_api and DHANHQ_AVAILABLE:
+        if self.mode == 'live' and self.breeze_api and BREEZE_CONNECT_AVAILABLE:
             try:
-                # Determine transaction type
-                transaction_type = TransactionType.BUY if signal.signal_type.startswith("BUY") else TransactionType.SELL
+                # Determine buy/sell action
+                action = "buy" if signal.signal_type.startswith("BUY") else "sell"
                 
-                # Place order via Dhan API
-                response = self.dhan_api.place_order(
-                    security_id=option_details.get('symbol', ''),
-                    exchange_segment=ExchangeSegment.NFO.value,
-                    transaction_type=transaction_type.value,
-                    quantity=quantity,
-                    order_type=OrderType.MARKET.value,
-                    product_type=ProductType.INTRADAY.value,
-                    price=0.0  # Market order
+                # Get option symbol for Breeze Connect
+                option_symbol = self.data_handler.get_option_symbol(
+                    strike, 
+                    signal.option_type, 
+                    expiry_date
                 )
                 
-                if response and 'data' in response and 'orderId' in response['data']:
-                    order_id = response['data']['orderId']
+                # Place order via Breeze Connect API
+                response = self.breeze_api.place_order(
+                    stock_code=option_symbol,
+                    exchange_code="NFO",
+                    product=ProductType.INTRADAY.value,
+                    action=action.upper(),
+                    order_type=OrderType.MARKET.value,
+                    quantity=str(quantity),
+                    price="0",  # Market order
+                    validity="day",
+                    validity_date="",  # Current day
+                    disclosed_quantity="0",
+                    expiry_date=expiry_date.strftime("%Y-%m-%d"),
+                    right=signal.option_type.upper(),
+                    strike_price=str(strike),
+                    user_remark=f"AlgoTrade_{signal.signal_type}"
+                )
+                
+                if response and isinstance(response, dict) and 'Success' in response and response['Success']:
+                    order_id = response.get('reference_id', str(uuid.uuid4()))
                     self.logger.info(f"Order placed successfully: {order_id}")
                 else:
-                    self.logger.error(f"Failed to place order: {response}")
+                    error_msg = response.get('Error', 'Unknown error') if isinstance(response, dict) else str(response)
+                    self.logger.error(f"Failed to place order: {error_msg}")
                     return None
                     
             except Exception as e:
-                self.logger.error(f"Error placing order: {e}")
+                self.logger.error(f"Error placing order: {e}", exc_info=True)
                 return None
         else:
             # Simulation mode
-            self.logger.info(f"Simulated order for {quantity} {option_details.get('symbol', '')} at {entry_price}")
+            order_id = f"SIM_{str(uuid.uuid4())[:8]}"
+            self.logger.info(f"Simulated order {order_id} for {quantity} {option_details.get('symbol', '')} at {entry_price}")
         
         # Create position object
         position = Position(
@@ -274,12 +323,12 @@ class ExecutionHandler:
         exit_price = round(exit_price * 20) / 20
         
         # Execute the trade
-        if self.mode == 'live' and self.dhan_api and DHANHQ_AVAILABLE:
+        if self.mode == 'live' and self.breeze_api and BREEZE_CONNECT_AVAILABLE:
             try:
-                # Determine transaction type (opposite of position type)
-                transaction_type = TransactionType.SELL if position.type.startswith("BUY") else TransactionType.BUY
+                # Determine buy/sell action (opposite of position type)
+                action = "sell" if position.type.startswith("BUY") else "buy"
                 
-                # Get option symbol
+                # Get option symbol for Breeze Connect
                 expiry_date = self.data_handler.get_current_and_next_expiry(datetime.now())[0]
                 option_symbol = self.data_handler.get_option_symbol(
                     position.strike, 
@@ -287,27 +336,37 @@ class ExecutionHandler:
                     expiry_date
                 )
                 
-                # Place order via Dhan API
-                response = self.dhan_api.place_order(
-                    security_id=option_symbol,
-                    exchange_segment=ExchangeSegment.NFO.value,
-                    transaction_type=transaction_type.value,
-                    quantity=position.quantity,
+                # Place close order via Breeze Connect API
+                response = self.breeze_api.place_order(
+                    stock_code=option_symbol,
+                    exchange_code="NFO",
+                    product=ProductType.INTRADAY.value,
+                    action=action.upper(),
                     order_type=OrderType.MARKET.value,
-                    product_type=ProductType.INTRADAY.value,
-                    price=0.0  # Market order
+                    quantity=str(position.quantity),
+                    price="0",  # Market order
+                    validity="day",
+                    validity_date="",  # Current day
+                    disclosed_quantity="0",
+                    expiry_date=expiry_date.strftime("%Y-%m-%d"),
+                    right=position.option_type.upper(),
+                    strike_price=str(position.strike),
+                    user_remark=f"AlgoTrade_CLOSE_{position.id}"
                 )
                 
-                if response and 'data' in response and 'orderId' in response['data']:
-                    self.logger.info(f"Close order placed successfully: {response['data']['orderId']}")
+                if response and isinstance(response, dict) and 'Success' in response and response['Success']:
+                    order_id = response.get('reference_id', str(uuid.uuid4()))
+                    self.logger.info(f"Close order placed successfully: {order_id}")
                 else:
-                    self.logger.error(f"Failed to place close order: {response}")
+                    error_msg = response.get('Error', 'Unknown error') if isinstance(response, dict) else str(response)
+                    self.logger.error(f"Failed to place close order: {error_msg}")
                     
             except Exception as e:
-                self.logger.error(f"Error placing close order: {e}")
+                self.logger.error(f"Error placing close order: {e}", exc_info=True)
         else:
             # Simulation mode
-            self.logger.info(f"Simulated close order for position {position.id} at {exit_price}")
+            order_id = f"SIM_CLOSE_{str(uuid.uuid4())[:8]}"
+            self.logger.info(f"Simulated close order {order_id} for position {position.id} at {exit_price}")
         
         # Calculate P&L
         pnl = (exit_price - position.entry_price) * position.quantity
